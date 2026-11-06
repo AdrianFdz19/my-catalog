@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "[DevSecOps] Iniciando Fase: Plan & Code Security..."
+
+# ==========================================
+# 1. ESCANEO DE SECRETOS (TruffleHog)
+# ==========================================
+if command -v trufflehog >/dev/null 2>&1; then
+    echo "🔍 Buscando secretos y credenciales expuestas..."
+    
+    # Sintaxis correcta para escanear cambios locales en el área de preparación antes del commit
+    trufflehog git file://. --no-update --fail
+    
+    if [ $? -ne 0 ]; then
+        echo "❌ [ERROR DE SEGURIDAD] Se detectaron posibles secretos o credenciales expuestas. Commit cancelado."
+        exit 1
+    fi
+else
+    echo "⚠️  TruffleHog no está instalado en el PATH. Saltando escaneo de secretos."
+fi
+
+# ==========================================
+# 2. CALIDAD DE CÓDIGO (Next.js Frontend)
+# ==========================================
+echo "🎨 Validando linter en la subcarpeta /client..."
+npm run lint --prefix client
+if [ $? -ne 0 ]; then
+    echo "❌ [ERROR] Falló el linter de Next.js. Commit cancelado."
+    exit 1
+fi
+
+# ==========================================
+# 3. SEGURIDAD DE INFRAESTRUCTURA (Trivy para Terraform)
+# ==========================================
+if command -v trivy >/dev/null 2>&1; then
+    echo "🏗️  Analizando seguridad en plantillas de Terraform con Trivy..."
+    # config: analiza archivos de IaC (Terraform, CloudFormation, etc.)
+    # --exit-code 1: rompe el proceso si encuentra vulnerabilidades
+    # --severity CRITICAL,HIGH: bloquea solo si son fallos graves (así no te frena por alertas menores)
+    trivy config --exit-code 1 --severity CRITICAL,HIGH ./terraform
+    
+    if [ $? -ne 0 ]; then
+        echo "❌ [ERROR DE SEGURIDAD] Terraform tiene fallas críticas de infraestructura. Commit cancelado."
+        exit 1
+    fi
+else
+    echo "⚠️  Trivy no está instalado en el PATH. Saltando escaneo de infraestructura."
+fi
+
+echo "✅ [DevSecOps] ¡Fase de Code & Plan superada exitosamente!"

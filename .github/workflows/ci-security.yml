@@ -1,0 +1,50 @@
+name: DevSecOps CI Pipeline
+
+# El pipeline se activa únicamente cuando se abre o actualiza un Pull Request hacia main
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    name: Code & Infrastructure Audit
+    runs-on: ubuntu-latest # Levanta una máquina virtual Linux limpia en la nube
+
+    steps:
+      # 1. Descargar el código del repositorio en la máquina virtual
+      - name: 📥 Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Descarga todo el historial de Git (obligatorio para TruffleHog)
+
+      # 2. Escaneo de Secretos en la Nube con la Action Oficial de TruffleHog
+      - name: 🔍 Scan for Leaked Secrets (TruffleHog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --exclude-paths=.trufflehog-exclude
+
+      # 3. Configurar Node.js para validar el Frontend
+      - name: ⚙️ Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: client/package.json
+
+      # 4. Instalar dependencias y correr el Linter de Next.js
+      - name: 🎨 Run Next.js Linter
+        run: |
+          cd client
+          npm ci
+          npm run lint
+
+      # 5. Escaneo de Infraestructura con la Action Oficial de Trivy
+      - name: 🏗️ Scan Terraform for Misconfigurations (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: './terraform'
+          exit-code: '1' # Rompe el pipeline si encuentra vulnerabilidades
+          severity: 'CRITICAL,HIGH'
