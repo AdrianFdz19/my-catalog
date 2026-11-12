@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Producto } from "./types/product";
+import { createClient } from "@/app/utils/supabase/client"; // Importamos el cliente de navegador de Supabase
 
 const CATEGORIAS = ["Todos", "Laptops & MacBooks", "Cámaras de Seguridad", "Accesorios"];
 
@@ -64,7 +65,6 @@ function CatalogoContenido() {
 
       {/* FILTROS POR CATEGORÍA */}
       <section className="mb-8 sm:mb-10">
-
         {/* DESPLEGABLE TÁCTIL PARA CELULARES (< 640px) */}
         <div className="block sm:hidden w-full">
           <label htmlFor="categoria-select" className="sr-only">
@@ -84,13 +84,8 @@ function CatalogoContenido() {
               ))}
             </select>
 
-            {/* ÍCONO DE FLECHA DROPDOWN */}
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-              <svg
-                className="w-4 h-4 fill-current"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                 <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
               </svg>
             </div>
@@ -105,26 +100,24 @@ function CatalogoContenido() {
               <button
                 key={cat}
                 onClick={() => setCategoriaSeleccionada(cat)}
-                className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border ${isActive
+                className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border ${
+                  isActive
                     ? "bg-slate-950 text-white border-slate-950 shadow-sm"
                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
-                  }`}
+                }`}
               >
                 {cat}
               </button>
             );
           })}
         </div>
-
       </section>
 
       {/* GRID DE PRODUCTOS */}
       <section>
         {loading ? (
           <div className="py-20 text-center">
-            <p className="text-slate-500 text-sm font-mono animate-pulse">
-              Cargando catálogo...
-            </p>
+            <p className="text-slate-500 text-sm font-mono animate-pulse">Cargando catálogo...</p>
           </div>
         ) : productosFiltrados.length === 0 ? (
           <div className="py-20 text-center border border-dashed border-slate-300 rounded-2xl">
@@ -137,14 +130,12 @@ function CatalogoContenido() {
                 key={producto.id}
                 className="group relative bg-white border border-slate-200 hover:border-slate-300 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between"
               >
-                {/* TAG / INSIGNIA */}
                 {producto.tag && (
                   <span className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-md rounded-md shadow-sm">
                     {producto.tag}
                   </span>
                 )}
 
-                {/* CONTENEDOR DE IMAGEN (Adaptativo en altura) */}
                 <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
                   <Image
                     src={producto.imagen || "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"}
@@ -155,7 +146,6 @@ function CatalogoContenido() {
                   />
                 </div>
 
-                {/* INFORMACIÓN DEL PRODUCTO */}
                 <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
                   <div>
                     <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
@@ -166,7 +156,6 @@ function CatalogoContenido() {
                     </h2>
                   </div>
 
-                  {/* PRECIO Y ACCIONES */}
                   <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
                       ${producto.precio} <span className="text-[10px] text-slate-500 font-normal">USD</span>
@@ -191,7 +180,6 @@ function CatalogoContenido() {
                       </a>
                     </div>
                   </div>
-
                 </div>
               </article>
             ))}
@@ -204,22 +192,53 @@ function CatalogoContenido() {
 
 // Componente Principal de la Ruta
 export default function Home() {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Verificamos si el admin está logueado en el cliente al montar la página
+  useEffect(() => {
+    async function checkUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setIsAdmin(true);
+      }
+    }
+    checkUser();
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-slate-200 selection:text-slate-900">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
 
         {/* HERO SECTION */}
-        <section className="mb-14 text-left border-b border-slate-200 pb-10">
-          <span className="inline-block px-3 py-1 mb-4 text-xs font-mono uppercase tracking-widest text-slate-600 bg-slate-200/60 border border-slate-300 rounded-md">
-            Mi Catálogo
-          </span>
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-950 leading-tight">
-            Tecnología y Seguridad <br />
-            <span className="text-slate-400">Diseño & Rendimiento</span>
-          </h1>
-          <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl leading-relaxed">
-            Explora nuestro catálogo de laptops, MacBooks y sistemas de vigilancia de última generación.
-          </p>
+        <section className="mb-14 text-left border-b border-slate-200 pb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div>
+            <span className="inline-block px-3 py-1 mb-4 text-xs font-mono uppercase tracking-widest text-slate-600 bg-slate-200/60 border border-slate-300 rounded-md">
+              Mi Catálogo
+            </span>
+            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-950 leading-tight">
+              Tecnología y Seguridad <br />
+              <span className="text-slate-400">Diseño & Rendimiento</span>
+            </h1>
+            <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl leading-relaxed">
+              Explora nuestro catálogo de laptops, MacBooks y sistemas de vigilancia de última generación.
+            </p>
+          </div>
+
+          {/* BOTÓN DE ADMIN CONDICIONAL */}
+          {isAdmin && (
+            <div className="shrink-0">
+              <Link
+                href="/products/add"
+                className="inline-flex items-center gap-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white bg-slate-950 hover:bg-slate-800 rounded-xl transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                + Add Product
+              </Link>
+            </div>
+          )}
         </section>
 
         {/* CONTENIDO DENTRO DE SUSPENSE */}
