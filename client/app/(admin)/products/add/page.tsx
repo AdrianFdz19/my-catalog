@@ -87,7 +87,7 @@ export default function AddProductPage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/products"
+              href="/"
               className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition"
             >
               Cancel

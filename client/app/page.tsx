@@ -22,7 +22,7 @@ function CatalogoContenido() {
   useEffect(() => {
     async function fetchProductos() {
       try {
-        const res = await fetch("/api/productos");
+        const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Error al cargar productos");
         const data: Producto[] = await res.json();
         setProductos(data);
@@ -163,7 +163,7 @@ function CatalogoContenido() {
 
                     <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
                       <Link
-                        href={`/producto/${producto.id}`}
+                        href={`/product/${producto.id}`}
                         className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md sm:rounded-lg transition-all"
                       >
                         Ver

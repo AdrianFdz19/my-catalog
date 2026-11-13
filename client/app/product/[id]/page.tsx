@@ -19,7 +19,7 @@ function ProductoDetalleContenido({
   useEffect(() => {
     async function fetchProducto() {
       try {
-        const res = await fetch("/api/productos");
+        const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Error al consultar API");
         const productos: Producto[] = await res.json();
         const encontrado = productos.find((p) => String(p.id) === String(id));
