@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', // Permite cualquier ruta dentro de tu cloud de Cloudinary
       },
+      {
+        protocol: 'https',
+        hostname: 'cgofuouwfjfawyeimexa.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
   },
   experimental: {

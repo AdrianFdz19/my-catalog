@@ -4,16 +4,32 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Producto } from "./types/product";
+import { Product } from "./types/product";
 import { createClient } from "@/app/utils/supabase/client"; // Importamos el cliente de navegador de Supabase
-
-const CATEGORIAS = ["Todos", "Laptops & MacBooks", "Cámaras de Seguridad", "Accesorios"];
 
 // Componente interno que consume useSearchParams
 function CatalogoContenido() {
-  const [productos, setProductos] = useState<Producto[]>([]);
+  const [productos, setProductos] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("Todos");
+  const [categories, setCategories] = useState<string[]>(["Todos"]); // Iniciamos con "Todos"
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        if (res.ok) {
+          const data = await res.json();
+          // Extraemos solo los nombres de las categorías reales y agregamos "Todos" al inicio
+          const categoryNames = data.map((cat: any) => cat.name);
+          setCategories(["Todos", ...categoryNames]);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    }
+    fetchCategories();
+  }, []);
 
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q")?.toLowerCase() || "";
@@ -24,7 +40,7 @@ function CatalogoContenido() {
       try {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Error al cargar productos");
-        const data: Producto[] = await res.json();
+        const data: Product[] = await res.json();
         setProductos(data);
       } catch (error) {
         console.error("Error:", error);
@@ -38,13 +54,13 @@ function CatalogoContenido() {
   // Filtrado combinado
   const productosFiltrados = productos.filter((producto) => {
     const cumpleCategoria =
-      categoriaSeleccionada === "Todos" || producto.categoria === categoriaSeleccionada;
+      categoriaSeleccionada === "Todos" || producto.category === categoriaSeleccionada;
 
     const cumpleBusqueda =
       searchQuery === "" ||
-      producto.nombre.toLowerCase().includes(searchQuery) ||
-      producto.descripcion.toLowerCase().includes(searchQuery) ||
-      producto.categoria.toLowerCase().includes(searchQuery);
+      producto.name.toLowerCase().includes(searchQuery) ||
+      producto.description.toLowerCase().includes(searchQuery) ||
+      producto.category.toLowerCase().includes(searchQuery);
 
     return cumpleCategoria && cumpleBusqueda;
   });
@@ -77,9 +93,9 @@ function CatalogoContenido() {
               onChange={(e) => setCategoriaSeleccionada(e.target.value)}
               className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-900 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 shadow-sm transition-all"
             >
-              {CATEGORIAS.map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat} className="text-slate-800 bg-white py-2">
-                  {cat === "TODOS" ? "Todas las Categorías" : cat}
+                  {cat === "Todos" ? "Todas las Categorías" : cat}
                 </option>
               ))}
             </select>
@@ -94,17 +110,16 @@ function CatalogoContenido() {
 
         {/* BOTONES HORIZONTALES PARA ESCRITORIO (>= 640px) */}
         <div className="hidden sm:flex items-center gap-2 overflow-x-auto w-full pb-2 no-scrollbar">
-          {CATEGORIAS.map((cat) => {
+          {categories.map((cat) => {
             const isActive = categoriaSeleccionada === cat;
             return (
               <button
                 key={cat}
                 onClick={() => setCategoriaSeleccionada(cat)}
-                className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border ${
-                  isActive
-                    ? "bg-slate-950 text-white border-slate-950 shadow-sm"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border ${isActive
+                  ? "bg-slate-950 text-white border-slate-950 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
               >
                 {cat}
               </button>
@@ -138,8 +153,8 @@ function CatalogoContenido() {
 
                 <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
                   <Image
-                    src={producto.imagen || "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"}
-                    alt={producto.nombre}
+                    src={producto.image_url || "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"}
+                    alt={producto.name}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className="object-contain group-hover:scale-105 transition-transform duration-500 ease-out p-2 sm:p-4"
@@ -149,16 +164,16 @@ function CatalogoContenido() {
                 <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
                   <div>
                     <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
-                      {producto.categoria}
+                      {producto.category}
                     </p>
                     <h2 className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-2 sm:line-clamp-1 min-h-[2rem] sm:min-h-0">
-                      {producto.nombre}
+                      {producto.name}
                     </h2>
                   </div>
 
                   <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
-                      ${producto.precio} <span className="text-[10px] text-slate-500 font-normal">USD</span>
+                      ${producto.price} <span className="text-[10px] text-slate-500 font-normal">USD</span>
                     </span>
 
                     <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
@@ -170,7 +185,7 @@ function CatalogoContenido() {
                       </Link>
                       <a
                         href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(
-                          `Hola, me interesa el producto: ${producto.nombre} ($${producto.precio} USD). ¿Sigue disponible?`
+                          `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"

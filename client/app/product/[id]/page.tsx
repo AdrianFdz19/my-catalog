@@ -3,7 +3,7 @@
 import { useState, useEffect, use, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Producto } from "@/app/types/product";
+import { Product } from "@/app/types/product";
 
 // Componente interno que consume los params asíncronos
 function ProductoDetalleContenido({
@@ -13,7 +13,7 @@ function ProductoDetalleContenido({
 }) {
   const { id } = use(params);
 
-  const [producto, setProducto] = useState<Producto | null>(null);
+  const [producto, setProducto] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ function ProductoDetalleContenido({
       try {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Error al consultar API");
-        const productos: Producto[] = await res.json();
+        const productos: Product[] = await res.json();
         const encontrado = productos.find((p) => String(p.id) === String(id));
         setProducto(encontrado || null);
       } catch (error) {
@@ -62,7 +62,7 @@ function ProductoDetalleContenido({
   }
 
   const mensajeWhatsApp = encodeURIComponent(
-    `Hola, me interesa obtener más información sobre el producto: ${producto.nombre} ($${producto.precio} USD).`
+    `Hola, me interesa obtener más información sobre el producto: ${producto.name} ($${producto.price} USD).`
   );
 
   return (
@@ -77,10 +77,10 @@ function ProductoDetalleContenido({
         )}
         <Image
           src={
-            producto.imagen ||
+            producto.image_url ||
             "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"
           }
-          alt={producto.nombre}
+          alt={producto.name}
           fill
           sizes="(max-width: 768px) 100vw, 50vw"
           className="object-contain p-6"
@@ -92,15 +92,15 @@ function ProductoDetalleContenido({
       <div className="flex flex-col justify-between">
         <div>
           <span className="text-xs uppercase tracking-widest text-slate-400 font-mono font-semibold">
-            {producto.categoria}
+            {producto.category}
           </span>
           <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
-            {producto.nombre}
+            {producto.name}
           </h1>
 
           <div className="mt-4 pb-6 border-b border-slate-100">
             <span className="text-3xl font-bold text-slate-950 font-mono">
-              ${producto.precio} USD
+              ${producto.price} USD
             </span>
           </div>
 
@@ -110,7 +110,7 @@ function ProductoDetalleContenido({
               Especificaciones Técnicas
             </h3>
             <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-              {producto.descripcion || "Sin especificaciones adicionales proporcionadas."}
+              {producto.description || "Sin especificaciones adicionales proporcionadas."}
             </p>
           </div>
         </div>
