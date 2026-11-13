@@ -4,13 +4,21 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import Link from "next/link";
 
+interface RecentProduct {
+    id: string | number;
+    name: string;
+    price: number;
+    image_url?: string | null;
+    created_at: string;
+}
+
 export default function AdminDashboardPage() {
     const supabase = createClient();
     const [stats, setStats] = useState({
         productsCount: 0,
         categoriesCount: 0,
     });
-    const [recentProducts, setRecentProducts] = useState<any[]>([]);
+    const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

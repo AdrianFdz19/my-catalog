@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 
 interface Category {
@@ -27,27 +27,28 @@ export default function AdminCategoriesPage() {
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
 
-    async function fetchCategories() {
+    const fetchCategories = useCallback(async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from("categories")
                 .select("*")
-                .order("name", { ascending: true });
+                .order("created_at", { ascending: false });
 
             if (error) throw error;
             setCategories(data || []);
-        } catch (error: any) {
-            console.error("Error cargando categorías:", error.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error("Error al cargar categorías:", message);
         } finally {
             setLoading(false);
         }
-    }
+    }, [supabase]);
 
     // Cargar categorías al montar la página
     useEffect(() => {
         fetchCategories();
-    }, []);
+    }, [fetchCategories]);
 
     // Crear nueva categoría a través de la API protegida
     async function handleCreateCategory(e: React.FormEvent) {
@@ -166,11 +167,10 @@ export default function AdminCategoriesPage() {
                                     key={icon}
                                     type="button"
                                     onClick={() => setSelectedIcon(icon)}
-                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${
-                                        selectedIcon === icon
-                                            ? "bg-slate-950 text-white shadow-sm scale-105"
-                                            : "bg-white hover:bg-slate-200 text-slate-700 border border-slate-200"
-                                    }`}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${selectedIcon === icon
+                                        ? "bg-slate-950 text-white shadow-sm scale-105"
+                                        : "bg-white hover:bg-slate-200 text-slate-700 border border-slate-200"
+                                        }`}
                                 >
                                     {icon}
                                 </button>
