@@ -27,24 +27,27 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
+  // Obtener usuario autenticado de Supabase
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect all (admin) routes
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/products') || 
-                       request.nextUrl.pathname.startsWith('/admin')
+  const path = request.nextUrl.pathname
 
+  // Protegemos todas las rutas que comiencen con /admin
+  const isAdminRoute = path.startsWith('/admin')
+
+  // Si intenta entrar a una ruta de admin sin sesión, lo mandamos al login
   if (isAdminRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Redirect to admin dashboard if already logged in and trying to visit /login
-  if (request.nextUrl.pathname === '/login' && user) {
+  // Si ya tiene sesión y está en el login, lo redirigimos al panel de administración
+  if (path === '/login' && user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/products/add'
+    url.pathname = '/admin/categories' // O la página de inicio de tu admin
     return NextResponse.redirect(url)
   }
 

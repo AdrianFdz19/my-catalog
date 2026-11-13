@@ -4,8 +4,9 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Product } from "./types/product";
+import { Product } from "../types/product";
 import { createClient } from "@/app/utils/supabase/client"; // Importamos el cliente de navegador de Supabase
+import ChatWidget from "../components/ChatWidget";
 
 // Componente interno que consume useSearchParams
 function CatalogoContenido() {
@@ -244,7 +245,7 @@ export default function Home() {
           {isAdmin && (
             <div className="shrink-0">
               <Link
-                href="/products/add"
+                href="/admin/products/add"
                 className="inline-flex items-center gap-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white bg-slate-950 hover:bg-slate-800 rounded-xl transition-all shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,6 +267,8 @@ export default function Home() {
         </Suspense>
 
       </main>
+
+      <ChatWidget />
     </div>
   );
 }

@@ -1,6 +1,4 @@
-import Header from "./components/Header";
-import { Suspense } from "react";
-import "./globals.css"; // Ajusta la ruta según tu estructura
+import "./globals.css";
 
 export const metadata = {
   title: "Mijail Catálogo - Tecnología & Seguridad",
@@ -15,12 +13,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased bg-slate-50 text-slate-900">
-        <Suspense fallback={
-          <header className="h-16 w-full border-b border-slate-200 bg-white/80" />
-        }>
-          <Header />
-        </Suspense>
-          {children}
+        {children}
       </body>
     </html>
   );

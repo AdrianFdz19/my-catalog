@@ -1,6 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/app/utils/supabase/server";
 
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Función para generar embeddings con OpenAI
+async function generateEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -152,6 +167,31 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
+    }
+
+    // 5. Generar y guardar el Embedding para el RAG
+    try {
+      // Armamos un texto rico que contenga toda la info clave del producto
+      const textToEmbed = `Producto: ${name}. Categoría ID: ${category_id}. Precio: $${price} USD. Stock: ${stock}. Descripción: ${description || "Sin descripción"}. Etiqueta: ${tag || "Ninguna"}`;
+
+      const vector = await generateEmbedding(textToEmbed);
+
+      const { error: embeddingError } = await supabase
+        .from("product_embeddings")
+        .insert([
+          {
+            product_id: productId,
+            chunk_text: textToEmbed,
+            embedding: vector, // Supabase con pgvector acepta arreglos de números directamente
+          },
+        ]);
+
+      if (embeddingError) {
+        console.error("Error al guardar el embedding en Supabase:", embeddingError);
+        // No detenemos la respuesta principal, pero lo logueamos
+      }
+    } catch (embedErr) {
+      console.error("Error al comunicarse con OpenAI para el embedding:", embedErr);
     }
 
     return NextResponse.json(
