@@ -22,7 +22,7 @@ function CatalogoContenido() {
         if (res.ok) {
           const data = await res.json();
           // Extraemos solo los nombres de las categorías reales y agregamos "Todos" al inicio
-          const categoryNames = data.map((cat: any) => cat.name);
+          const categoryNames = data.map((cat: Product) => cat.name);
           setCategories(["Todos", ...categoryNames]);
         }
       } catch (error) {

@@ -27,11 +27,6 @@ export default function AdminCategoriesPage() {
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
 
-    // Cargar categorías al montar la página
-    useEffect(() => {
-        fetchCategories();
-    }, []);
-
     async function fetchCategories() {
         try {
             setLoading(true);
@@ -48,6 +43,11 @@ export default function AdminCategoriesPage() {
             setLoading(false);
         }
     }
+
+    // Cargar categorías al montar la página
+    useEffect(() => {
+        fetchCategories();
+    }, []);
 
     // Crear nueva categoría a través de la API protegida
     async function handleCreateCategory(e: React.FormEvent) {

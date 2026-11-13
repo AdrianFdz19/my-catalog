@@ -24,34 +24,34 @@ export default function AdminProductsPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchProducts();
-    }, []);
+        async function fetchProducts() {
+            try {
+                setLoading(true);
+                const { data, error } = await supabase
+                    .from("products")
+                    .select(`
+                        id,
+                        name,
+                        price,
+                        image_url,
+                        created_at,
+                        categories (
+                            name
+                        )
+                    `)
+                    .order("created_at", { ascending: false });
 
-    async function fetchProducts() {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from("products")
-                .select(`
-                    id,
-                    name,
-                    price,
-                    image_url,
-                    created_at,
-                    categories (
-                        name
-                    )
-                `)
-                .order("created_at", { ascending: false });
-
-            if (error) throw error;
-            setProducts(data || []);
-        } catch (error: any) {
-            console.error("Error cargando productos:", error.message);
-        } finally {
-            setLoading(false);
+                if (error) throw error;
+                setProducts(data || []);
+            } catch (err: unknown) {
+                console.error("Error cargando productos:", err instanceof Error ? err.message : String(err));
+            } finally {
+                setLoading(false);
+            }
         }
-    }
+
+        fetchProducts();
+    }, [supabase]);
 
     async function handleDeleteProduct(id: string | number) {
         if (!confirm("¿Estás seguro de eliminar este producto del inventario?")) return;
