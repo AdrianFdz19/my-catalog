@@ -10,7 +10,6 @@ interface Product {
     price: number;
     image_url?: string | null;
     created_at?: string;
-    // Permitimos que categories sea un objeto o un arreglo para evitar conflictos de TS
     categories?: {
         name: string;
     } | {
@@ -22,6 +21,11 @@ export default function AdminProductsPage() {
     const supabase = createClient();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Estados para el Modal de Eliminación Segura
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [confirmInput, setConfirmInput] = useState("");
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         async function fetchProducts() {
@@ -53,19 +57,39 @@ export default function AdminProductsPage() {
         fetchProducts();
     }, [supabase]);
 
-    async function handleDeleteProduct(id: string | number) {
-        if (!confirm("¿Estás seguro de eliminar este producto del inventario?")) return;
+    // Ejecutar la eliminación a través de la API protegida
+    async function handleConfirmDelete() {
+        if (!productToDelete) return;
 
         try {
-            const { error } = await supabase.from("products").delete().eq("id", id);
-            if (error) throw error;
-            setProducts(products.filter((prod) => prod.id !== id));
-        } catch (error: any) {
-            alert("No se pudo eliminar el producto: " + error.message);
+            setDeleting(true);
+            const response = await fetch(`/api/products/${productToDelete.id}`, {
+                method: "DELETE",
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || "Error al eliminar el producto");
+
+            setProducts(products.filter((prod) => prod.id !== productToDelete.id));
+            closeDeleteModal();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            alert("No se pudo eliminar el producto: " + message);
+        } finally {
+            setDeleting(false);
         }
     }
 
-    // Función auxiliar para extraer el nombre de la categoría sin importar si viene como objeto o array
+    function openDeleteModal(product: Product) {
+        setProductToDelete(product);
+        setConfirmInput("");
+    }
+
+    function closeDeleteModal() {
+        setProductToDelete(null);
+        setConfirmInput("");
+    }
+
     const getCategoryName = (categories: Product["categories"]) => {
         if (!categories) return "Sin categoría";
         if (Array.isArray(categories)) {
@@ -75,7 +99,7 @@ export default function AdminProductsPage() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 relative">
             {/* Encabezado */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
                 <div>
@@ -186,9 +210,15 @@ export default function AdminProductsPage() {
                                     <span className="text-[11px] font-mono text-slate-400 tabular-nums hidden sm:inline">
                                         {prod.created_at ? new Date(prod.created_at).toLocaleDateString() : ""}
                                     </span>
+                                    <Link
+                                        href={`/admin/products/edit/${prod.id}`}
+                                        className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium"
+                                    >
+                                        <span>Editar</span>
+                                    </Link>
                                     <button
                                         type="button"
-                                        onClick={() => handleDeleteProduct(prod.id)}
+                                        onClick={() => openDeleteModal(prod)}
                                         className="inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 border border-transparent hover:border-rose-200/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-xs font-medium"
                                         title="Eliminar producto"
                                     >
@@ -203,7 +233,77 @@ export default function AdminProductsPage() {
                     </div>
                 )}
             </div>
-        </div>
 
+            {/* ----------------- MODAL DE ELIMINACIÓN SEGURA ----------------- */}
+            {productToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                Confirmar Eliminación Definitiva
+                            </h3>
+                            <button
+                                onClick={closeDeleteModal}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer text-xs font-mono"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Tarjeta resumen del producto a eliminar */}
+                        <div className="flex items-center gap-3.5 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                            <div className="w-12 h-12 bg-white rounded-lg border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                                {productToDelete.image_url ? (
+                                    <img src={productToDelete.image_url} alt={productToDelete.name} className="w-full h-full object-contain p-1" />
+                                ) : (
+                                    <span className="text-base">📦</span>
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="text-xs font-semibold text-slate-900 truncate">{productToDelete.name}</h4>
+                                <p className="text-[11px] font-mono text-slate-500 mt-0.5">${Number(productToDelete.price).toLocaleString()} USD</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <p className="text-xs text-slate-600">
+                                Esta acción no se puede deshacer. Para confirmar, escribe exactamente el nombre del producto:{" "}
+                                <span className="font-semibold text-slate-900 select-all font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {productToDelete.name}
+                                </span>
+                            </p>
+
+                            <input
+                                type="text"
+                                value={confirmInput}
+                                onChange={(e) => setConfirmInput(e.target.value)}
+                                placeholder="Escribe el nombre aquí..."
+                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 transition-all font-mono"
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={closeDeleteModal}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={confirmInput !== productToDelete.name || deleting}
+                                onClick={handleConfirmDelete}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer shadow-sm"
+                            >
+                                {deleting ? "Eliminando..." : "Eliminar Definitivamente"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

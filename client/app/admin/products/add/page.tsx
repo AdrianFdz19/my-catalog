@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
+import ProductAiFillBox from "@/app/components/ProductAiFillBox";
 
 export default function AddProductPage() {
   const [formData, setFormData] = useState({
@@ -44,6 +45,26 @@ export default function AddProductPage() {
     }
     fetchCategories();
   }, []);
+
+  // Función que recibe los datos procesados por la IA y actualiza el formulario
+  const handleAiFill = (aiData: {
+    name: string;
+    slug: string;
+    description: string;
+    price: string;
+    stock: string;
+    tag: string;
+  }) => {
+    setFormData((prev) => ({
+      ...prev,
+      name: aiData.name || prev.name,
+      slug: aiData.slug || prev.slug,
+      description: aiData.description || prev.description,
+      price: aiData.price || prev.price,
+      stock: aiData.stock || prev.stock,
+      tag: aiData.tag || prev.tag,
+    }));
+  };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
@@ -214,6 +235,8 @@ export default function AddProductPage() {
             </button>
           </div>
         </div>
+
+        <ProductAiFillBox onFill={ handleAiFill } />
 
         {/* Form Grid */}
         <form

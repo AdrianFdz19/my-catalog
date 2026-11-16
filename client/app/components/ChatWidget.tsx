@@ -6,16 +6,22 @@ import { useState, useRef, useEffect } from "react";
 import ChatProductCard from "./ChatProductCard";
 import ChatCategoryPills from "./ChatCategoryPills";
 
+interface ProductItem {
+    id: number | string;
+    name: string;
+    price: number;
+    stock: number;
+    image_url?: string;
+}
+
 interface Message {
     role: "user" | "assistant";
     content: string;
-    showProductCard?: boolean;
+    products?: ProductItem[];
     showCategories?: boolean;
 }
 
 export default function ChatWidget() {
-    const [selectedTemplate, setSelectedTemplate] = useState("product-card");
-
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -29,8 +35,10 @@ export default function ChatWidget() {
 
     // Auto-scroll hacia abajo al recibir un nuevo mensaje
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, loading]);
+        if (isOpen) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages, loading, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,14 +46,26 @@ export default function ChatWidget() {
 
         const userMessage = input.trim();
         setInput("");
-        setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+
+        // Creamos el nuevo arreglo incluyendo el mensaje actual del usuario
+        const updatedMessages = [...messages, { role: "user" as const, content: userMessage }];
+        setMessages(updatedMessages);
         setLoading(true);
 
         try {
+            // Tomamos los últimos mensajes anteriores para enviarlos como historial de contexto
+            const recentHistory = updatedMessages.slice(-5, -1).map((m) => ({
+                role: m.role,
+                content: m.content,
+            }));
+
             const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: userMessage }),
+                body: JSON.stringify({
+                    message: userMessage,
+                    history: recentHistory
+                }),
             });
 
             const data = await res.json();
@@ -54,10 +74,27 @@ export default function ChatWidget() {
                 throw new Error(data.error || "Ocurrió un error en el chat.");
             }
 
-            // La IA solo responde texto normal
+            // 🔊 Reproducir sonido coqueto al recibir respuesta del asistente
+            try {
+                const audio = new Audio("/sounds/notification.mp3");
+                audio.volume = 0.4; // Volumen sutil (de 0.0 a 1.0)
+                audio.play().catch((e) => {
+                    // Los navegadores a veces bloquean el audio si el usuario no ha interactuado antes con la página, 
+                    // este catch evita que la consola muestre errores molestos si eso pasa.
+                    console.log("Audio bloqueado por políticas del navegador:", e);
+                });
+            } catch (err) {
+                console.error("Error al reproducir audio:", err);
+            }
+
+            // Agregamos la respuesta del asistente y sus productos dinámicos
             setMessages((prev) => [
                 ...prev,
-                { role: "assistant", content: data.reply },
+                {
+                    role: "assistant",
+                    content: data.reply,
+                    products: data.products || []
+                },
             ]);
         } catch (error) {
             console.error(error);
@@ -73,36 +110,13 @@ export default function ChatWidget() {
         }
     };
 
-    // Función para activar manualmente el Mock de la Product Card
-    const handleTriggerTemplate = () => {
-        if (selectedTemplate === "product-card") {
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: "Aquí tienes una tarjeta de producto de prueba:",
-                    showProductCard: true, // Renderiza la tarjeta en este mensaje
-                },
-            ]);
-        } else if (selectedTemplate === "categories") {
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: "Explora nuestras categorías principales:",
-                    showCategories: true, // Renderiza las categorías en este mensaje
-                },
-            ]);
-        }
-    };
-
     return (
         <div className="fixed bottom-5 right-5 z-50 font-sans">
             {/* Botón flotante para abrir/cerrar */}
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="flex items-center gap-2.5 bg-slate-950 hover:bg-slate-800 text-white px-5 py-3.5 rounded-full shadow-xl transition-all duration-300 hover:scale-105 border border-slate-800 group"
+                    className="flex items-center gap-2.5 bg-slate-950 hover:bg-slate-800 text-white px-5 py-3.5 rounded-full shadow-xl transition-all duration-300 hover:scale-105 border border-slate-800 group cursor-pointer"
                 >
                     <svg
                         className="w-5 h-5 text-slate-300 group-hover:text-white transition-colors"
@@ -123,11 +137,11 @@ export default function ChatWidget() {
 
             {/* Ventana de chat desplegada */}
             {isOpen && (
-                <div className="w-[90vw] sm:w-[380px] h-[520px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all animate-in fade-in slide-in-from-bottom-5 duration-300">
+                <div className="w-[90vw] sm:w-[400px] h-[560px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all animate-in fade-in slide-in-from-bottom-5 duration-300">
                     {/* Header del Chat */}
                     <div className="bg-slate-950 text-white px-4 py-3.5 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                             <div>
                                 <h3 className="text-xs font-bold uppercase tracking-wider">Soporte MyCatalog</h3>
                                 <p className="text-[10px] text-slate-400">Impulsado por Inteligencia Artificial</p>
@@ -135,7 +149,7 @@ export default function ChatWidget() {
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
-                            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+                            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -143,42 +157,35 @@ export default function ChatWidget() {
                         </button>
                     </div>
 
-                    {/* Barra de herramientas / Selector libre de plantillas para Devs */}
-                    <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200 flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 font-medium">Dev Sandbox:</span>
-                        <div className="flex items-center gap-1.5">
-                            <select
-                                value={selectedTemplate}
-                                onChange={(e) => setSelectedTemplate(e.target.value)}
-                                className="bg-white border border-slate-300 text-slate-800 rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-slate-950 cursor-pointer"
-                            >
-                                <option value="product-card">Product Card</option>
-                                <option value="categories">Categories Pills</option>
-                            </select>
-                            <button
-                                type="button"
-                                onClick={handleTriggerTemplate}
-                                className="bg-slate-950 hover:bg-slate-800 text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all cursor-pointer"
-                            >
-                                Agregar
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Cuerpo de mensajes */}
-                    <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50 text-xs">
+                    {/* Cuerpo de mensajes (Tipografía ampliada a text-sm para mayor comodidad visual) */}
+                    <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50 text-sm">
                         {messages.map((msg, index) => (
                             <div key={index} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div
-                                    className={`max-w-[95%] px-3.5 py-2.5 rounded-xl leading-relaxed whitespace-pre-wrap ${msg.role === "user"
-                                            ? "bg-slate-950 text-white rounded-br-none"
-                                            : "bg-white text-slate-800 border border-slate-200 shadow-sm rounded-bl-none"
+                                    className={`max-w-[95%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-xs ${msg.role === "user"
+                                        ? "bg-slate-950 text-white rounded-br-none"
+                                        : "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
                                         }`}
                                 >
                                     {msg.content}
                                 </div>
 
-                                {/* Si este mensaje tiene la bandera de categorías, las muestra */}
+                                {/* Si el mensaje incluye productos encontrados por el RAG, renderizamos las tarjetas dinámicamente */}
+                                {msg.products && msg.products.length > 0 && (
+                                    <div className="mt-2.5 w-full max-w-[95%] space-y-2">
+                                        {msg.products.map((prod) => (
+                                            <ChatProductCard
+                                                key={prod.id}
+                                                productId={prod.id}
+                                                name={prod.name}
+                                                price={String(prod.price)}
+                                                image_url={prod.image_url || "https://via.placeholder.com/400"}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Si el mensaje muestra categorías */}
                                 {msg.showCategories && (
                                     <div className="mt-2 w-full max-w-[95%]">
                                         <ChatCategoryPills
@@ -188,25 +195,13 @@ export default function ChatWidget() {
                                         />
                                     </div>
                                 )}
-
-                                {/* Si este mensaje tiene la bandera de product card, la muestra */}
-                                {msg.showProductCard && (
-                                    <div className="mt-2 w-full max-w-[95%]">
-                                        <ChatProductCard
-                                            productId={10}
-                                            name="Laptop 2019"
-                                            price="12,500"
-                                            image_url="https://cgofuouwfjfawyeimexa.supabase.co/storage/v1/object/public/products/1794536186109-zhwtd8a.jpg"
-                                        />
-                                    </div>
-                                )}
                             </div>
                         ))}
 
                         {loading && (
                             <div className="flex justify-start">
-                                <div className="bg-white text-slate-500 border border-slate-200 px-3.5 py-2 rounded-xl text-[11px] font-mono shadow-sm animate-pulse">
-                                    Escribiendo respuesta...
+                                <div className="bg-white text-slate-500 border border-slate-200 px-4 py-2.5 rounded-2xl text-xs font-mono shadow-xs animate-pulse">
+                                    Buscando en el catálogo...
                                 </div>
                             </div>
                         )}
@@ -220,12 +215,12 @@ export default function ChatWidget() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Pregúntame sobre algún producto..."
-                            className="flex-1 px-3.5 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-950 text-slate-900 transition"
+                            className="flex-1 px-4 py-2.5 text-sm bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-950 text-slate-900 transition"
                         />
                         <button
                             type="submit"
                             disabled={loading || !input.trim()}
-                            className="bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
+                            className="bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
                         >
                             Enviar
                         </button>

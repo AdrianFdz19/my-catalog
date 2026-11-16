@@ -20,12 +20,19 @@ export default function AdminCategoriesPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Estados del formulario (incluyendo description)
+    // Estados del formulario de Creación
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [selectedIcon, setSelectedIcon] = useState("💻");
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
+
+    // Estados para el modo de Edición (Fila actual en edición)
+    const [editingCategoryId, setEditingCategoryId] = useState<string | number | null>(null);
+    const [editName, setEditName] = useState("");
+    const [editDescription, setEditDescription] = useState("");
+    const [editIcon, setEditIcon] = useState("💻");
+    const [updating, setUpdating] = useState(false);
 
     const fetchCategories = useCallback(async () => {
         try {
@@ -82,10 +89,64 @@ export default function AdminCategoriesPage() {
             setDescription("");
             setSelectedIcon("💻");
             fetchCategories();
-        } catch (error: any) {
-            setErrorMsg(error.message || "Error al conectar con el servidor");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            setErrorMsg(message || "Error al conectar con el servidor");
         } finally {
             setSubmitting(false);
+        }
+    }
+
+    // Iniciar edición de una categoría
+    function startEditing(cat: Category) {
+        setEditingCategoryId(cat.id);
+        setEditName(cat.name);
+        setEditDescription(cat.description || "");
+        setEditIcon(cat.icon || "💻");
+    }
+
+    // Cancelar edición
+    function cancelEditing() {
+        setEditingCategoryId(null);
+        setEditName("");
+        setEditDescription("");
+        setEditIcon("💻");
+    }
+
+    // Guardar cambios usando el endpoint PATCH
+    async function handleUpdateCategory(id: string | number) {
+        if (!editName.trim()) return;
+
+        try {
+            setUpdating(true);
+            setErrorMsg("");
+
+            const response = await fetch(`/api/categories/${id}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    name: editName.trim(),
+                    description: editDescription.trim() ? editDescription.trim() : null,
+                    icon: editIcon,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Error al actualizar la categoría");
+            }
+
+            // Salir del modo edición y refrescar lista
+            cancelEditing();
+            fetchCategories();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            alert("No se pudo actualizar: " + message);
+        } finally {
+            setUpdating(false);
         }
     }
 
@@ -94,11 +155,17 @@ export default function AdminCategoriesPage() {
         if (!confirm("¿Estás seguro de eliminar esta categoría? Si hay productos asociados, asegúrate de desvincularlos primero.")) return;
 
         try {
-            const { error } = await supabase.from("categories").delete().eq("id", id);
-            if (error) throw error;
+            const response = await fetch(`/api/categories/${id}`, {
+                method: "DELETE",
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || "Error al eliminar");
+
             setCategories(categories.filter((cat) => cat.id !== id));
-        } catch (error: any) {
-            alert("No se pudo eliminar: " + error.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            alert("No se pudo eliminar: " + message);
         }
     }
 
@@ -187,10 +254,11 @@ export default function AdminCategoriesPage() {
                                     key={icon}
                                     type="button"
                                     onClick={() => setSelectedIcon(icon)}
-                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${selectedIcon === icon
-                                        ? "bg-slate-950 text-white shadow-sm scale-105"
-                                        : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
-                                        }`}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${
+                                        selectedIcon === icon
+                                            ? "bg-slate-950 text-white shadow-sm scale-105"
+                                            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
+                                    }`}
                                 >
                                     {icon}
                                 </button>
@@ -222,7 +290,6 @@ export default function AdminCategoriesPage() {
                 </form>
             </div>
 
-
             {/* Lista / Tabla de Categorías Existentes */}
             <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -252,55 +319,123 @@ export default function AdminCategoriesPage() {
                         <p className="text-xs font-medium text-slate-600">
                             No hay categorías registradas todavía.
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                            Crea la primera usando el formulario de arriba.
-                        </p>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {categories.map((cat) => (
-                            <div
-                                key={cat.id}
-                                className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50/80 transition-colors group"
-                            >
-                                <div className="flex items-start gap-3.5 min-w-0">
-                                    <span className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-base shrink-0">
-                                        {cat.icon || "📁"}
-                                    </span>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <h4 className="text-xs font-semibold text-slate-900">
-                                                {cat.name}
-                                            </h4>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-mono text-slate-500">
-                                                /{cat.slug || "n-a"}
-                                            </span>
-                                        </div>
-                                        {cat.description && (
-                                            <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
-                                                {cat.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
+                        {categories.map((cat) => {
+                            const isEditing = editingCategoryId === cat.id;
 
-                                <button
-                                    type="button"
-                                    onClick={() => handleDeleteCategory(cat.id)}
-                                    className="inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 border border-transparent hover:border-rose-200/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-xs font-medium shrink-0"
-                                    title="Eliminar categoría"
+                            return (
+                                <div
+                                    key={cat.id}
+                                    className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 transition-colors"
                                 >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                    </svg>
-                                    <span>Eliminar</span>
-                                </button>
-                            </div>
-                        ))}
+                                    {isEditing ? (
+                                        /* ----------------- MODO EDICIÓN EN LÍNEA ----------------- */
+                                        <div className="flex-1 space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={editName}
+                                                    onChange={(e) => setEditName(e.target.value)}
+                                                    placeholder="Nombre"
+                                                    className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-950 text-slate-900"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editDescription}
+                                                    onChange={(e) => setEditDescription(e.target.value)}
+                                                    placeholder="Descripción opcional"
+                                                    className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-950 text-slate-900 sm:col-span-2"
+                                                />
+                                            </div>
+
+                                            {/* Selector rápido de iconos en edición */}
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[10px] font-semibold text-slate-500 uppercase mr-1">Icono:</span>
+                                                {PRESET_ICONS.map((ic) => (
+                                                    <button
+                                                        key={ic}
+                                                        type="button"
+                                                        onClick={() => setEditIcon(ic)}
+                                                        className={`w-7 h-7 rounded-md flex items-center justify-center text-xs transition-all cursor-pointer ${
+                                                            editIcon === ic ? "bg-slate-950 text-white" : "bg-white hover:bg-slate-100 border border-slate-200"
+                                                        }`}
+                                                    >
+                                                        {ic}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <button
+                                                    type="button"
+                                                    disabled={updating || !editName.trim()}
+                                                    onClick={() => handleUpdateCategory(cat.id)}
+                                                    className="bg-slate-950 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                                                >
+                                                    {updating ? "Guardando..." : "Guardar Cambios"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelEditing}
+                                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* ----------------- MODO VISTA NORMAL ----------------- */
+                                        <>
+                                            <div className="flex items-start gap-3.5 min-w-0">
+                                                <span className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-base shrink-0">
+                                                    {cat.icon || "📁"}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h4 className="text-xs font-semibold text-slate-900">
+                                                            {cat.name}
+                                                        </h4>
+                                                        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-mono text-slate-500">
+                                                            /{cat.slug || "n-a"}
+                                                        </span>
+                                                    </div>
+                                                    {cat.description && (
+                                                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
+                                                            {cat.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEditing(cat)}
+                                                    className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-xs font-medium"
+                                                    title="Editar categoría"
+                                                >
+                                                    <span>Editar</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteCategory(cat.id)}
+                                                    className="inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 border border-transparent hover:border-rose-200/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-xs font-medium"
+                                                    title="Eliminar categoría"
+                                                >
+                                                    <span>Eliminar</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
-
         </div>
     );
 }

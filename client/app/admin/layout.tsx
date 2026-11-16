@@ -4,6 +4,39 @@ import { createClient } from "@/app/utils/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
+
+// Subcomponente interno para manejar los links y el pathname protegido por Suspense
+function AdminNavMenu() {
+    const pathname = usePathname();
+
+    const navLinks = [
+        { href: "/admin", label: "Dashboard" },
+        { href: "/admin/categories", label: "Categorías" },
+        { href: "/admin/products", label: "Productos" },
+    ];
+
+    return (
+        <nav className="hidden sm:flex items-center gap-1">
+            {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                    <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            isActive
+                                ? "bg-slate-100 text-slate-950"
+                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                    >
+                        {link.label}
+                    </Link>
+                );
+            })}
+        </nav>
+    );
+}
 
 export default function AdminLayout({
     children,
@@ -23,21 +56,13 @@ export default function AdminLayout({
         }
     }
 
-    const pathname = usePathname();
-
-    const navLinks = [
-        { href: "/admin", label: "Dashboard" },
-        { href: "/admin/categories", label: "Categorías" },
-        { href: "/admin/products", label: "Productos" },
-    ];
-
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-12">
             {/* Header Superior del Panel Admin */}
-            <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 mb-6">
+            <header className="bg-white/85 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 mb-6">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
 
-                    {/* Izquierda: Logo + Navegación */}
+                    {/* Izquierda: Logo + Navegación (con Suspense para evitar bloqueo de prerenderizado) */}
                     <div className="flex items-center gap-6">
                         <Link href="/admin" className="font-bold text-slate-900 tracking-tight flex items-center gap-2.5 group">
                             <span className="w-7 h-7 rounded-lg bg-slate-950 group-hover:bg-slate-800 transition-colors text-white flex items-center justify-center text-xs font-mono shadow-xs">
@@ -46,23 +71,9 @@ export default function AdminLayout({
                             <span className="text-sm font-bold">Admin Panel</span>
                         </Link>
 
-                        <nav className="hidden sm:flex items-center gap-1">
-                            {navLinks.map((link) => {
-                                const isActive = pathname === link.href;
-                                return (
-                                    <Link
-                                        key={link.href}
-                                        href={link.href}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isActive
-                                            ? "bg-slate-100 text-slate-950"
-                                            : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                                            }`}
-                                    >
-                                        {link.label}
-                                    </Link>
-                                );
-                            })}
-                        </nav>
+                        <Suspense fallback={<div className="h-6 w-48 bg-slate-100 rounded-lg animate-pulse" />}>
+                            <AdminNavMenu />
+                        </Suspense>
                     </div>
 
                     {/* Derecha: Ver Tienda + Cerrar Sesión */}

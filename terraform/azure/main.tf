@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=5.0.0"
+      version = "5.0"
     }
   }
 }
@@ -52,35 +52,73 @@ resource "azurerm_container_app" "api" {
     password_secret_name = "acr-password"
   }
 
+  # --- SECRETS (Must use lowercase and hyphens) ---
   secret {
     name  = "acr-password"
     value = azurerm_container_registry.acr.admin_password
   }
 
+  secret {
+    name  = "openai-api-key"
+    value = var.openai_api_key
+  }
+
+  secret {
+    name  = "google-service-account-json"
+    value = file("${path.module}/service-account.json")
+  }
+
   template {
+    min_replicas = 1
+    max_replicas = 3
+
     container {
       name   = "mi-catalogo-ui"
       image  = "${azurerm_container_registry.acr.login_server}/mi-catalogo:v1"
-      cpu    = "0.25"
-      memory = "0.5Gi"
+      cpu    = "0.5"
+      memory = "1.0Gi"
 
-      # Environment variables for your app (e.g., Google Sheets integration later)
+      # Standard environment variables
       env {
         name  = "NODE_ENV"
         value = "production"
       }
-
       env {
         name  = "GOOGLE_SHEET_CSV_URL"
         value = var.google_sheet_csv_url
       }
+      env {
+        name  = "NEXT_PUBLIC_SUPABASE_URL"
+        value = var.next_public_supabase_url
+      }
+      env {
+        name  = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+        value = var.next_public_supabase_anon_key
+      }
+      env {
+        name  = "GOOGLE_SHEET_ID"
+        value = var.google_sheet_id
+      }
+      env {
+        name  = "GOOGLE_SERVICE_ACCOUNT"
+        value = var.google_service_account
+      }
+
+      # Secret-backed environment variables (use secret_name instead of value)
+      env {
+        name        = "OPENAI_API_KEY"
+        secret_name = "openai-api-key"
+      }
+      env {
+        name        = "GOOGLE_SERVICE_ACCOUNT_JSON"
+        secret_name = "google-service-account-json"
+      }
     }
   }
 
-  # Ingress configuration to expose your Next.js app to the internet
   ingress {
     external_enabled = true
-    target_port      = 3000 # Matches the port your Next.js standalone container exposes
+    target_port      = 3000
     traffic_weight {
       percentage      = 100
       latest_revision = true

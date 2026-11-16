@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/app/utils/supabase/server";
 
 import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { appendProductToSheet } from "@/app/lib/googleSheets";
 
 // Función para generar embeddings con OpenAI
 async function generateEmbedding(text: string) {
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   const response = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: text,
@@ -193,6 +195,11 @@ export async function POST(request: Request) {
     } catch (embedErr) {
       console.error("Error al comunicarse con OpenAI para el embedding:", embedErr);
     }
+
+    // 2. Si se guardó bien, mandas los datos a Google Sheets en segundo plano:
+    await appendProductToSheet({
+      name, price, stock, category: "accesorios"
+    });
 
     return NextResponse.json(
       { success: true, product_id: productId },

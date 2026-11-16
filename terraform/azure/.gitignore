@@ -20,3 +20,5 @@
 
 # Archivos de planes de ejecución exportados (Pueden contener secretos)
 *.tfplan
+
+service-account.json
