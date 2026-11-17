@@ -1,28 +1,53 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Product } from "../types/product";
-import { createClient } from "@/app/utils/supabase/client"; // Importamos el cliente de navegador de Supabase
+import { FormattedProduct } from "../lib/products";
+import { createClient } from "@/app/utils/supabase/client";
 import ChatWidget from "../components/ChatWidget";
+import { whatsappNumber } from "../lib/tenant";
 
-// Componente interno que consume useSearchParams
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+const ITEMS_PER_PAGE = 12;
+
 function CatalogoContenido() {
-  const [productos, setProductos] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("Todos");
-  const [categories, setCategories] = useState<string[]>(["Todos"]); // Iniciamos con "Todos"
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
+  const searchQuery = searchParams.get("q") || "";
+  const categoriaSeleccionada = searchParams.get("category") || "Todos";
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+  const [productos, setProductos] = useState<FormattedProduct[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    totalItems: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [categories, setCategories] = useState<string[]>(["Todos"]);
+
+  // Cargar categorías
   useEffect(() => {
     async function fetchCategories() {
       try {
         const res = await fetch("/api/categories");
         if (res.ok) {
           const data = await res.json();
-          // Extraemos solo los nombres de las categorías reales y agregamos "Todos" al inicio
-          const categoryNames = data.map((cat: Product) => cat.name);
+          const categoryNames = data.map((cat: { name: string }) => cat.name);
           setCategories(["Todos", ...categoryNames]);
         }
       } catch (error) {
@@ -32,17 +57,29 @@ function CatalogoContenido() {
     fetchCategories();
   }, []);
 
-  const searchParams = useSearchParams();
-  const searchQuery = searchParams.get("q")?.toLowerCase() || "";
-
-  // Carga de productos desde la API Handler
+  // Cargar productos paginados y filtrados desde /api/products
   useEffect(() => {
     async function fetchProductos() {
       try {
-        const res = await fetch("/api/products");
+        setLoading(true);
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(ITEMS_PER_PAGE),
+        });
+
+        if (categoriaSeleccionada && categoriaSeleccionada !== "Todos") {
+          params.set("category", categoriaSeleccionada);
+        }
+        if (searchQuery) {
+          params.set("q", searchQuery);
+        }
+
+        const res = await fetch(`/api/products?${params.toString()}`);
         if (!res.ok) throw new Error("Error al cargar productos");
-        const data: Product[] = await res.json();
-        setProductos(data);
+
+        const result = await res.json();
+        setProductos(result.data || []);
+        setPagination(result.pagination);
       } catch (error) {
         console.error("Error:", error);
       } finally {
@@ -50,21 +87,41 @@ function CatalogoContenido() {
       }
     }
     fetchProductos();
-  }, []);
+  }, [currentPage, categoriaSeleccionada, searchQuery]);
 
-  // Filtrado combinado
-  const productosFiltrados = productos.filter((producto) => {
-    const cumpleCategoria =
-      categoriaSeleccionada === "Todos" || producto.category === categoriaSeleccionada;
+  // Helper para actualizar URL manteniendo filtros activos
+  function updateUrlParams(updates: { page?: number; category?: string; q?: string }) {
+    const params = new URLSearchParams(searchParams.toString());
 
-    const cumpleBusqueda =
-      searchQuery === "" ||
-      producto.name.toLowerCase().includes(searchQuery) ||
-      producto.description.toLowerCase().includes(searchQuery) ||
-      producto.category.toLowerCase().includes(searchQuery);
+    if (updates.category !== undefined) {
+      if (updates.category === "Todos") params.delete("category");
+      else params.set("category", updates.category);
+    }
 
-    return cumpleCategoria && cumpleBusqueda;
-  });
+    if (updates.q !== undefined) {
+      if (!updates.q) params.delete("q");
+      else params.set("q", updates.q);
+    }
+
+    if (updates.page !== undefined) {
+      if (updates.page <= 1) params.delete("page");
+      else params.set("page", String(updates.page));
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `/?${queryString}` : "/", { scroll: false });
+  }
+
+  function handleSelectCategory(cat: string) {
+    // Al cambiar de categoría reiniciamos a página 1
+    updateUrlParams({ category: cat, page: 1 });
+  }
+
+  function handlePageChange(newPage: number) {
+    updateUrlParams({ page: newPage });
+    // Desplazar suavemente hacia el inicio de la sección del catálogo
+    document.getElementById("catalogo-grid")?.scrollIntoView({ behavior: "smooth" });
+  }
 
   return (
     <>
@@ -72,16 +129,21 @@ function CatalogoContenido() {
       {searchQuery && (
         <div className="mb-6 flex items-center justify-between bg-slate-200/50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs">
           <span className="text-slate-700">
-            Resultados para la búsqueda: <strong className="text-slate-950 font-semibold">&ldquo;{searchQuery}&rdquo;</strong>
+            Resultados para la búsqueda:{" "}
+            <strong className="text-slate-950 font-semibold">&ldquo;{searchQuery}&rdquo;</strong>
           </span>
-          <Link href="/" className="text-slate-500 hover:text-slate-950 font-medium underline">
+          <button
+            type="button"
+            onClick={() => updateUrlParams({ q: "", page: 1 })}
+            className="text-slate-500 hover:text-slate-950 font-medium underline cursor-pointer"
+          >
             Limpiar búsqueda
-          </Link>
+          </button>
         </div>
       )}
 
       {/* FILTROS POR CATEGORÍA */}
-      <section className="mb-8 sm:mb-10">
+      <section id="catalogo-grid" className="mb-8 sm:mb-10 scroll-mt-8">
         {/* DESPLEGABLE TÁCTIL PARA CELULARES (< 640px) */}
         <div className="block sm:hidden w-full">
           <label htmlFor="categoria-select" className="sr-only">
@@ -91,7 +153,7 @@ function CatalogoContenido() {
             <select
               id="categoria-select"
               value={categoriaSeleccionada}
-              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+              onChange={(e) => handleSelectCategory(e.target.value)}
               className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-900 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 shadow-sm transition-all"
             >
               {categories.map((cat) => (
@@ -110,111 +172,186 @@ function CatalogoContenido() {
         </div>
 
         {/* BOTONES HORIZONTALES PARA ESCRITORIO (>= 640px) */}
-        <div className="hidden sm:flex items-center gap-2 overflow-x-auto w-full pb-2 no-scrollbar">
-          {categories.map((cat) => {
-            const isActive = categoriaSeleccionada === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => setCategoriaSeleccionada(cat)}
-                className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border ${isActive
-                  ? "bg-slate-950 text-white border-slate-950 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+        <div className="hidden sm:flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {categories.map((cat) => {
+              const isActive = categoriaSeleccionada === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleSelectCategory(cat)}
+                  className={`px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer ${
+                    isActive
+                      ? "bg-slate-950 text-white border-slate-950 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
                   }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {!loading && pagination.totalItems > 0 && (
+            <span className="text-xs font-mono text-slate-400 shrink-0">
+              {pagination.totalItems} {pagination.totalItems === 1 ? "producto" : "productos"}
+            </span>
+          )}
         </div>
       </section>
 
       {/* GRID DE PRODUCTOS */}
       <section>
         {loading ? (
-          <div className="py-20 text-center">
-            <p className="text-slate-500 text-sm font-mono animate-pulse">Cargando catálogo...</p>
-          </div>
-        ) : productosFiltrados.length === 0 ? (
-          <div className="py-20 text-center border border-dashed border-slate-300 rounded-2xl">
-            <p className="text-slate-500 text-sm">No encontramos productos que coincidan con tu búsqueda.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-            {productosFiltrados.map((producto) => (
-              <article
-                key={producto.id}
-                className="group relative bg-white border border-slate-200 hover:border-slate-300 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between"
-              >
-                {producto.tag && (
-                  <span className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-md rounded-md shadow-sm">
-                    {producto.tag}
-                  </span>
-                )}
-
-                <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
-                  <Image
-                    src={producto.image_url || "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"}
-                    alt={producto.name}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="object-contain group-hover:scale-105 transition-transform duration-500 ease-out p-2 sm:p-4"
-                  />
-                </div>
-
-                <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
-                  <div>
-                    <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
-                      {producto.category}
-                    </p>
-                    <h2 className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-2 sm:line-clamp-1 min-h-[2rem] sm:min-h-0">
-                      {producto.name}
-                    </h2>
-                  </div>
-
-                  <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
-                      ${producto.price} <span className="text-[10px] text-slate-500 font-normal">USD</span>
-                    </span>
-
-                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-                      <Link
-                        href={`/product/${producto.id}`}
-                        className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md sm:rounded-lg transition-all"
-                      >
-                        Ver
-                      </Link>
-                      <a
-                        href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(
-                          `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-md sm:rounded-lg transition-all"
-                      >
-                        Cotizar
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </article>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-64 sm:h-80 bg-white border border-slate-200/80 rounded-xl sm:rounded-2xl animate-pulse"
+              />
             ))}
           </div>
+        ) : productos.length === 0 ? (
+          <div className="py-20 text-center border border-dashed border-slate-300 rounded-2xl">
+            <p className="text-slate-500 text-sm">
+              No encontramos productos que coincidan con tu búsqueda.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+              {productos.map((producto) => (
+                <article
+                  key={producto.id}
+                  className="group relative bg-white border border-slate-200 hover:border-slate-300 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between"
+                >
+                  {producto.tag && (
+                    <span className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-md rounded-md shadow-sm">
+                      {producto.tag}
+                    </span>
+                  )}
+
+                  <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
+                    <Image
+                      src={
+                        producto.image_url ||
+                        "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"
+                      }
+                      alt={producto.name}
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      className="object-contain group-hover:scale-105 transition-transform duration-500 ease-out p-2 sm:p-4"
+                    />
+                  </div>
+
+                  <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
+                    <div>
+                      <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
+                        {producto.category}
+                      </p>
+                      <h2 className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-2 sm:line-clamp-1 min-h-[2rem] sm:min-h-0">
+                        {producto.name}
+                      </h2>
+                    </div>
+
+                    <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
+                        ${producto.price}{" "}
+                        <span className="text-[10px] text-slate-500 font-normal">USD</span>
+                      </span>
+
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                        <Link
+                          href={`/product/${producto.id}`}
+                          className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md sm:rounded-lg transition-all"
+                        >
+                          Ver
+                        </Link>
+                        <a
+                          href={`https://wa.me/522291276558?text=${encodeURIComponent(
+                            `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-md sm:rounded-lg transition-all"
+                        >
+                          Cotizar
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {/* CONTROLES DE PAGINACIÓN */}
+            {pagination.totalPages > 1 && (
+              <div className="mt-12 pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-xs font-mono text-slate-500">
+                  Página <span className="font-semibold text-slate-900">{pagination.page}</span> de{" "}
+                  <span className="font-semibold text-slate-900">{pagination.totalPages}</span>
+                </p>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!pagination.hasPrevPage}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-950 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: pagination.totalPages }, (_, idx) => idx + 1).map(
+                      (pageNum) => {
+                        const isActive = pageNum === pagination.page;
+                        return (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl text-xs font-mono transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-slate-950 text-white font-semibold shadow-sm"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-950"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!pagination.hasNextPage}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-950 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </>
   );
 }
 
-// Componente Principal de la Ruta
 export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Verificamos si el admin está logueado en el cliente al montar la página
   useEffect(() => {
     async function checkUser() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setIsAdmin(true);
       }
@@ -225,7 +362,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-slate-200 selection:text-slate-900">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-
         {/* HERO SECTION */}
         <section className="mb-14 text-left border-b border-slate-200 pb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
@@ -258,14 +394,15 @@ export default function Home() {
         </section>
 
         {/* CONTENIDO DENTRO DE SUSPENSE */}
-        <Suspense fallback={
-          <div className="py-20 text-center">
-            <p className="text-slate-500 text-sm font-mono animate-pulse">Cargando catálogo...</p>
-          </div>
-        }>
+        <Suspense
+          fallback={
+            <div className="py-20 text-center">
+              <p className="text-slate-500 text-sm font-mono animate-pulse">Cargando catálogo...</p>
+            </div>
+          }
+        >
           <CatalogoContenido />
         </Suspense>
-
       </main>
 
       <ChatWidget />

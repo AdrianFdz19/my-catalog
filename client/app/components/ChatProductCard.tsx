@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { whatsappNumber } from "../lib/tenant";
 
 interface ProductCard {
     productId: number | string;
@@ -18,10 +19,12 @@ export default function ChatProductCard({
 }: ProductCard) {
   const router = useRouter();
 
+
   // Generamos el enlace dinámico de WhatsApp
-  const whatsappUrl = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''}?text=${encodeURIComponent(
+  const whatsappUrl = `https://wa.me/522291276558?text=${encodeURIComponent(
       `Hola, vi el producto "${name}" ($${price} USD) en el asistente virtual y me interesa. ¿Sigue disponible?`
   )}`;
+  
 
   return (
     <div className="flex justify-start">

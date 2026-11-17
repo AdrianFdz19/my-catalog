@@ -74,7 +74,7 @@ resource "azurerm_container_app" "api" {
 
     container {
       name   = "mi-catalogo-ui"
-      image  = "${azurerm_container_registry.acr.login_server}/mi-catalogo:v1"
+      image  = "${azurerm_container_registry.acr.login_server}/mi-catalogo:v2"
       cpu    = "0.5"
       memory = "1.0Gi"
 
@@ -83,22 +83,32 @@ resource "azurerm_container_app" "api" {
         name  = "NODE_ENV"
         value = "production"
       }
+
+      env {
+        name  = "NEXT_PUBLIC_WHATSAPP_NUMBER"
+        value = var.next_public_whatsapp_number
+      }
+
       env {
         name  = "GOOGLE_SHEET_CSV_URL"
         value = var.google_sheet_csv_url
       }
+
       env {
         name  = "NEXT_PUBLIC_SUPABASE_URL"
         value = var.next_public_supabase_url
       }
+
       env {
         name  = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
         value = var.next_public_supabase_anon_key
       }
+
       env {
         name  = "GOOGLE_SHEET_ID"
         value = var.google_sheet_id
       }
+
       env {
         name  = "GOOGLE_SERVICE_ACCOUNT"
         value = var.google_service_account

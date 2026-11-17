@@ -162,7 +162,7 @@ export default function AddProductPage() {
         images: uploadedImageUrls,
       };
 
-      const response = await fetch("/api/products", {
+      const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

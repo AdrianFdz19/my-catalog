@@ -10,6 +10,12 @@ variable "google_sheet_csv_url" {
   sensitive = true
 }
 
+variable "next_public_whatsapp_number" {
+  type = string
+  description = "Whatsapp Admin Number"
+  sensitive = true
+}
+
 variable "next_public_supabase_url" {
   type = string 
   description = "Google Sheet CSV URL"
@@ -36,12 +42,6 @@ variable "google_sheet_id" {
 
 variable "google_service_account" {
   type = string 
-  description = "Google Sheet CSV URL"
-  sensitive = true
-}
-
-variable "google_service_account_json" {
-  type = string
   description = "Google Sheet CSV URL"
   sensitive = true
 }

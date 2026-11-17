@@ -190,7 +190,7 @@ function EditProductContent({ params }: PageProps) {
         images: finalImagesArray,
       };
 
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(`/api/admin/products/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

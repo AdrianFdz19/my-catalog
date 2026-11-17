@@ -1,113 +1,55 @@
+import { formatProduct } from "@/app/lib/products";
 import { createClient } from "@/app/utils/supabase/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-interface RouteParams {
-    params: Promise<{
-        id: string;
-    }>;
-}
-
-// PATCH: Actualizar un producto existente de forma parcial
-export async function PATCH(request: Request, { params }: RouteParams) {
+export async function GET(
+    _request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
         const { id } = await params;
         const supabase = await createClient();
 
-        // 1. Validar autenticación
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-        }
-
-        // 2. Extraer datos del body
-        const body = await request.json();
-        const { name, slug, category_id, description, price, stock, is_active, images, tag } = body;
-
-        if (!name || !slug || !category_id || price === undefined) {
-            return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
-        }
-
-        // Definir la portada principal (la primera imagen del array)
-        const primaryImageUrl = images && images.length > 0 ? images[0] : null;
-
-        // 3. Actualizar datos principales en la tabla `products`
-        const { error: updateError } = await supabase
+        const { data, error } = await supabase
             .from("products")
-            .update({
-                name,
-                slug,
-                category_id: Number(category_id),
-                description,
-                price: parseFloat(price),
-                stock: parseInt(stock, 10) || 0,
-                image_url: primaryImageUrl,
-                is_active: is_active ?? true,
-                tag: tag ? tag.trim() : null,
-            })
-            .eq("id", id);
+            .select(
+                `
+                id, name, slug, tag, description, price, stock, is_active, created_at, image_url,
+                categories ( id, name, slug ),
+                product_images ( image_url, is_primary )
+                `
+            )
+            .eq("id", id)
+            .eq("is_active", true)
+            .single();
 
-        if (updateError) {
-            throw new Error(`Error al actualizar el producto: ${updateError.message}`);
+        if (error || !data) {
+            return NextResponse.json(
+                { error: "Producto no encontrado" },
+                { status: 404 }
+            );
         }
 
-        // 4. Sincronizar la tabla hija `product_images`
-        // Estrategia limpia: Borramos las imágenes anteriores del producto y reinsertamos las actuales
-        const { error: deleteImagesError } = await supabase
-            .from("product_images")
-            .delete()
-            .eq("product_id", id);
+        // Formateamos el producto base
+        const formatted = formatProduct(data);
 
-        if (deleteImagesError) {
-            throw new Error(`Error al limpiar imágenes anteriores: ${deleteImagesError.message}`);
-        }
+        // Agregamos o unificamos las imágenes provenientes de product_images
+        const imagesList = data.product_images && data.product_images.length > 0
+            ? data.product_images.map((img: { image_url: string }) => img.image_url)
+            : [data.image_url || "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"];
 
-        if (images && Array.isArray(images) && images.length > 0) {
-            const imageRecords = images.map((url: string, index: number) => ({
-                product_id: Number(id),
-                image_url: url,
-                is_primary: index === 0, // La primera imagen es la portada
-            }));
+        // Adjuntamos el array de imágenes a la respuesta que espera el frontend
+        const responseData = {
+            ...formatted,
+            images: imagesList,
+        };
 
-            const { error: insertImagesError } = await supabase
-                .from("product_images")
-                .insert(imageRecords);
-
-            if (insertImagesError) {
-                throw new Error(`Error al registrar las nuevas imágenes: ${insertImagesError.message}`);
-            }
-        }
-
-        return NextResponse.json({ success: true, message: "Producto actualizado correctamente" }, { status: 200 });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error("Error en PATCH product:", message);
-        return NextResponse.json({ error: message }, { status: 500 });
-    }
-}
-
-// DELETE: Eliminar un producto del inventario
-export async function DELETE(request: Request, { params }: RouteParams) {
-    try {
-        const { id } = await params;
-        const supabase = await createClient();
-
-        // 1. Verificar autenticación del administrador
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-        }
-
-        // 2. Eliminar de Supabase
-        const { error } = await supabase
-            .from("products")
-            .delete()
-            .eq("id", id);
-
-        if (error) throw error;
-
-        return NextResponse.json({ success: true, message: "Producto eliminado correctamente" }, { status: 200 });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return NextResponse.json({ error: message }, { status: 500 });
+        return NextResponse.json({ data: responseData }, { status: 200 });
+    } catch (error) {
+        console.error("Error en GET /api/products/[id]:", error);
+        return NextResponse.json(
+            { error: "Error interno del servidor" },
+            { status: 500 }
+        );
     }
 }

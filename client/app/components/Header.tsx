@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
+import { whatsappNumber } from "../lib/tenant";
 
 export default function Header() {
   const router = useRouter();
@@ -90,7 +91,7 @@ export default function Header() {
               </Link>
             )}
             <a
-              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
+              href={`https://wa.me/522291276558`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 active:scale-[0.98] rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
@@ -159,7 +160,7 @@ export default function Header() {
           )}
 
           <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
+            href={`https://wa.me/522291276558`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 active:scale-[0.98] rounded-xl transition-all flex items-center gap-2 shadow-xs"
