@@ -14,6 +14,7 @@ function AdminNavMenu() {
         { href: "/admin", label: "Dashboard" },
         { href: "/admin/categories", label: "Categorías" },
         { href: "/admin/products", label: "Productos" },
+        { href: "/admin/leads", label: "Prospectos (Leads)" },
     ];
 
     return (
