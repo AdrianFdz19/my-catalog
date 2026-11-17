@@ -4,6 +4,7 @@ import { useState, useEffect, use, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FormattedProduct } from "../../../lib/products";
+import { useCart } from "@/app/context/CartProvider"; // Ajusta la ruta a tu CartProvider
 
 // Número de WhatsApp institucional hardcodeado para evitar errores de inyección en contenedores
 const WHATSAPP_PHONE_NUMBER = "522291276558";
@@ -14,6 +15,9 @@ function ProductoDetalleContenido({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+
+  // Hook del carrito
+  const { cartIds, addToCart } = useCart();
 
   const [producto, setProducto] = useState<FormattedProduct | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,6 +84,9 @@ function ProductoDetalleContenido({
       : [producto.image_url || defaultFallbackImage];
 
   const currentImage = productImages[activeImageIndex] || defaultFallbackImage;
+
+  // Verificamos si este producto ya está agregado en el carrito
+  const isAdded = cartIds.includes(producto.id);
 
   // Funciones para navegar entre imágenes de forma circular
   const nextImage = (e?: React.MouseEvent) => {
@@ -203,16 +210,44 @@ function ProductoDetalleContenido({
             </div>
           </div>
 
-          {/* ACCIONES */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-4">
+          {/* ACCIONES (Agregar al Carrito + WhatsApp) */}
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-3">
+            {/* Botón de Agregar al Carrito */}
+            <button
+              type="button"
+              onClick={() => addToCart(producto.id)}
+              className={`w-full sm:flex-1 py-3.5 px-6 text-center text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
+                isAdded
+                  ? "bg-slate-900 text-white hover:bg-slate-800 scale-[1.01]"
+                  : "bg-slate-950 text-white hover:bg-slate-800"
+              }`}
+            >
+              {isAdded ? (
+                <>
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Agregado al Carrito</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  <span>Agregar al Carrito</span>
+                </>
+              )}
+            </button>
+
+            {/* Botón de WhatsApp */}
             <a
               href={`https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${mensajeWhatsApp}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:flex-1 py-3.5 px-6 text-center text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 group"
+              className="w-full sm:flex-1 py-3.5 px-6 text-center text-xs font-semibold text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Consultar Disponibilidad vía WhatsApp</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Consultar por WhatsApp</span>
             </a>
           </div>
         </div>

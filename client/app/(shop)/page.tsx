@@ -7,7 +7,7 @@ import Image from "next/image";
 import { FormattedProduct } from "../lib/products";
 import { createClient } from "@/app/utils/supabase/client";
 import ChatWidget from "../components/ChatWidget";
-import { whatsappNumber } from "../lib/tenant";
+import { useCart } from "@/app/context/CartProvider"; // Ajusta la ruta según donde guardaste CartProvider
 
 interface PaginationMeta {
   page: number;
@@ -23,6 +23,9 @@ const ITEMS_PER_PAGE = 12;
 function CatalogoContenido() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Hook del carrito
+  const { cartIds, addToCart } = useCart();
 
   const searchQuery = searchParams.get("q") || "";
   const categoriaSeleccionada = searchParams.get("category") || "Todos";
@@ -113,13 +116,11 @@ function CatalogoContenido() {
   }
 
   function handleSelectCategory(cat: string) {
-    // Al cambiar de categoría reiniciamos a página 1
     updateUrlParams({ category: cat, page: 1 });
   }
 
   function handlePageChange(newPage: number) {
     updateUrlParams({ page: newPage });
-    // Desplazar suavemente hacia el inicio de la sección del catálogo
     document.getElementById("catalogo-grid")?.scrollIntoView({ behavior: "smooth" });
   }
 
@@ -221,68 +222,105 @@ function CatalogoContenido() {
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-              {productos.map((producto) => (
-                <article
-                  key={producto.id}
-                  className="group relative bg-white border border-slate-200 hover:border-slate-300 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between"
-                >
-                  {producto.tag && (
-                    <span className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-md rounded-md shadow-sm">
-                      {producto.tag}
-                    </span>
-                  )}
+              {productos.map((producto) => {
+                // Verificamos si el producto ya está agregado en el carrito
+                const isAdded = cartIds.includes(producto.id);
 
-                  <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
-                    <Image
-                      src={
-                        producto.image_url ||
-                        "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"
-                      }
-                      alt={producto.name}
-                      fill
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                      className="object-contain group-hover:scale-105 transition-transform duration-500 ease-out p-2 sm:p-4"
-                    />
-                  </div>
+                return (
+                  <article
+                    key={producto.id}
+                    className="group relative bg-white border border-slate-200 hover:border-slate-300 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between"
+                  >
+                    {/* ETIQUETA / TAG */}
+                    {producto.tag && (
+                      <span className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-md rounded-md shadow-sm">
+                        {producto.tag}
+                      </span>
+                    )}
 
-                  <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
-                    <div>
-                      <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
-                        {producto.category}
-                      </p>
-                      <h2 className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-2 sm:line-clamp-1 min-h-[2rem] sm:min-h-0">
-                        {producto.name}
-                      </h2>
+                    {/* BOTÓN DE AGREGAR AL CARRITO / FAVORITOS */}
+                    <button
+                      type="button"
+                      onClick={() => addToCart(producto.id)}
+                      title={isAdded ? "Agregado al carrito" : "Agregar al carrito"}
+                      className={`absolute top-2 right-2 sm:top-3 sm:right-3 z-10 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center border backdrop-blur-md transition-all duration-200 shadow-sm cursor-pointer ${
+                        isAdded
+                          ? "bg-slate-950 text-white border-slate-950 scale-105"
+                          : "bg-white/90 text-slate-600 border-slate-200 hover:bg-slate-950 hover:text-white hover:border-slate-950"
+                      }`}
+                    >
+                      {isAdded ? (
+                        /* Ícono de check / guardado */
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        /* Ícono de bolsa/carrito de compras */
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* IMAGEN */}
+                    <div className="relative w-full h-36 sm:h-52 bg-slate-100/70 overflow-hidden flex items-center justify-center p-2 sm:p-4">
+                      <Image
+                        src={
+                          producto.image_url ||
+                          "https://res.cloudinary.com/dk0mjtyze/image/upload/v1768884165/assets-manager/obnght3c0lewythyn7dc.png"
+                        }
+                        alt={producto.name}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        className="object-contain group-hover:scale-105 transition-transform duration-500 ease-out p-2 sm:p-4"
+                      />
                     </div>
 
-                    <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
-                        ${producto.price}{" "}
-                        <span className="text-[10px] text-slate-500 font-normal">USD</span>
-                      </span>
+                    {/* DETALLES Y BOTONES */}
+                    <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between border-t border-slate-100">
+                      <div>
+                        <p className="text-[9px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-mono font-medium">
+                          {producto.category}
+                        </p>
+                        <h2 className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-2 sm:line-clamp-1 min-h-[2rem] sm:min-h-0">
+                          {producto.name}
+                        </h2>
+                      </div>
 
-                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-                        <Link
-                          href={`/product/${producto.id}`}
-                          className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md sm:rounded-lg transition-all"
-                        >
-                          Ver
-                        </Link>
-                        <a
-                          href={`https://wa.me/522291276558?text=${encodeURIComponent(
-                            `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-md sm:rounded-lg transition-all"
-                        >
-                          Cotizar
-                        </a>
+                      <div className="mt-3 sm:mt-6 pt-2 border-t border-slate-100/60 sm:border-t-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-sm sm:text-base font-bold text-slate-950 tracking-tight font-mono">
+                          ${producto.price}{" "}
+                          <span className="text-[10px] text-slate-500 font-normal">USD</span>
+                        </span>
+
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                          <Link
+                            href={`/product/${producto.id}`}
+                            className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md sm:rounded-lg transition-all"
+                          >
+                            Ver
+                          </Link>
+                          <a
+                            href={`https://wa.me/522291276558?text=${encodeURIComponent(
+                              `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full text-center py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-md sm:rounded-lg transition-all"
+                          >
+                            Cotizar
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
 
             {/* CONTROLES DE PAGINACIÓN */}
