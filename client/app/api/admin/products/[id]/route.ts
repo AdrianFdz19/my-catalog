@@ -1,6 +1,5 @@
-import { formatProduct } from "@/app/lib/products";
 import { createClient } from "@/app/utils/supabase/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 interface RouteParams {
     params: Promise<{

@@ -6,9 +6,6 @@ import Image from "next/image";
 import { FormattedProduct } from "../../../lib/products";
 import { useCart } from "@/app/context/CartProvider"; // Ajusta la ruta a tu CartProvider
 
-// Número de WhatsApp institucional hardcodeado para evitar errores de inyección en contenedores
-const WHATSAPP_PHONE_NUMBER = "522291276558";
-
 function ProductoDetalleContenido({
   params,
 }: {
@@ -241,7 +238,7 @@ function ProductoDetalleContenido({
 
             {/* Botón de WhatsApp */}
             <a
-              href={`https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${mensajeWhatsApp}`}
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${mensajeWhatsApp}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:flex-1 py-3.5 px-6 text-center text-xs font-semibold text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"

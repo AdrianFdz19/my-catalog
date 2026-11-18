@@ -9,7 +9,7 @@ import { useCart } from "@/app/context/CartProvider";
 const WHATSAPP_PHONE_NUMBER = "522291276558";
 
 export default function CartPage() {
-    const { cartIds, removeFromCart, clearCart } = useCart();
+    const { cartIds, guestUuid, removeFromCart, clearCart } = useCart();
     const [cartProducts, setCartProducts] = useState<FormattedProduct[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -18,41 +18,55 @@ export default function CartPage() {
     const [clientEmail, setClientEmail] = useState("");
     const [clientNotes, setClientNotes] = useState("");
 
-    // Estado para el modal de vaciar todo el carrito (único caso donde mantenemos confirmación)
     const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
-    // Sincronizar IDs del localStorage con la API para traer los productos completos
+    // 1. Sincronizar productos del carrito y consultar si el navegador ya tiene un lead asociado
     useEffect(() => {
-        async function fetchCartProducts() {
-            if (cartIds.length === 0) {
-                setCartProducts([]);
-                setLoading(false);
-                return;
-            }
-
+        async function fetchCartData() {
             try {
                 setLoading(true);
-                const res = await fetch("/api/cart", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ids: cartIds }),
-                });
 
-                if (!res.ok) throw new Error("Error al sincronizar carrito");
+                // Petición paralela: traer productos del carrito y buscar si ya existe el usuario por guestUuid
+                const [cartRes, guestRes] = await Promise.all([
+                    cartIds.length > 0
+                        ? fetch("/api/cart", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ids: cartIds }),
+                        })
+                        : Promise.resolve(null),
+                    guestUuid
+                        ? fetch(`/api/cart/guest?uuid=${guestUuid}`)
+                        : Promise.resolve(null),
+                ]);
 
-                const result = await res.json();
-                setCartProducts(result.data || []);
+                if (cartRes && cartRes.ok) {
+                    const cartResult = await cartRes.json();
+                    setCartProducts(cartResult.data || []);
+                } else {
+                    setCartProducts([]);
+                }
+
+                if (guestRes && guestRes.ok) {
+                    const guestResult = await guestRes.json();
+                    if (guestResult.lead) {
+                        setClientName(guestResult.lead.name || "");
+                        setClientPhone(guestResult.lead.phone || "");
+                        setClientEmail(guestResult.lead.email || "");
+                    }
+                }
             } catch (error) {
-                console.error("Error cargando carrito:", error);
+                console.error("Error cargando datos del carrito:", error);
             } finally {
                 setLoading(false);
             }
         }
 
-        fetchCartProducts();
-    }, [cartIds]);
+        fetchCartData();
+    }, [cartIds, guestUuid]);
 
-    // Calcular el total general de la cotización
     const totalPrice = cartProducts.reduce((acc, prod) => acc + (Number(prod.price) || 0), 0);
 
     const handleConfirmClear = () => {
@@ -60,46 +74,59 @@ export default function CartPage() {
         setIsConfirmOpen(false);
     };
 
-    // Función para generar el mensaje consolidado de WhatsApp
+    // 2. Validar obligatoriedad y enviar cotización
     const handleCheckoutWhatsApp = async () => {
+        console.log({ clientName, clientEmail, clientPhone });
         if (cartProducts.length === 0) return;
 
-        // 1. Guardar o actualizar los datos del usuario en Supabase si llenó al menos el nombre o teléfono
-        if (clientName.trim() || clientPhone.trim()) {
-            try {
-                const guestUuid = localStorage.getItem("guest_uuid");
-                await fetch("/api/users", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        uuid: guestUuid,
-                        name: clientName,
-                        phone: clientPhone,
-                        email: clientEmail
-                    }),
-                });
-            } catch (err) {
-                console.error("No se pudo registrar el usuario en la base de datos:", err);
-                // No detenemos el flujo de WhatsApp si falla el registro secundario para no afectar la conversión
-            }
+        setFormError(null);
+
+        // Validación estricta en cliente
+        if (!clientName.trim() || !clientPhone.trim()) {
+            setFormError("Por favor ingresa tu Nombre y Teléfono (WhatsApp) para continuar.");
+            return;
         }
 
-        // 2. Construir el mensaje de WhatsApp (como lo teníamos)
-        let message = "Hola, me interesa cotizar los siguientes productos:\n\n";
+        try {
+            setIsSubmitting(true);
+            const res = await fetch("/api/cart/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    guestUuid,
+                    name: clientName,
+                    phone: clientPhone,
+                    email: clientEmail,
+                    cartIds,
+                }),
+            });
 
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Error al registrar la cotización.");
+            }
+        } catch (err: any) {
+            console.error("Error al registrar lead:", err);
+            setFormError(err.message || "Hubo un error al guardar tu cotización.");
+            setIsSubmitting(false);
+            return;
+        } finally {
+            setIsSubmitting(false);
+        }
+
+        // Construir mensaje de WhatsApp
+        let message = "Hola, me interesa cotizar los siguientes productos:\n\n";
         cartProducts.forEach((prod, index) => {
             message += `${index + 1}. *${prod.name}* - $${prod.price} USD\n`;
         });
-
         message += `\n*Total estimado: $${totalPrice.toFixed(2)} USD*\n`;
 
-        if (clientName.trim() || clientPhone.trim() || clientNotes.trim()) {
-            message += `\n-------------------\n`;
-            message += `*Datos del cliente:*\n`;
-            if (clientName) message += `• Nombre: ${clientName}\n`;
-            if (clientPhone) message += `• Teléfono: ${clientPhone}\n`;
-            if (clientNotes) message += `• Notas: ${clientNotes}\n`;
-        }
+        message += `\n-------------------\n`;
+        message += `*Datos del cliente:*\n`;
+        message += `• Nombre: ${clientName}\n`;
+        message += `• Teléfono: ${clientPhone}\n`;
+        if (clientEmail) message += `• Correo: ${clientEmail}\n`;
+        if (clientNotes) message += `• Notas: ${clientNotes}\n`;
 
         message += `\n¿Están disponibles para entrega o envío?`;
 
@@ -119,7 +146,6 @@ export default function CartPage() {
         <div className="min-h-screen bg-slate-50 py-12 relative">
             <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
-                {/* ENCABEZADO */}
                 <div className="mb-8 flex items-center justify-between">
                     <div>
                         <Link
@@ -144,7 +170,6 @@ export default function CartPage() {
                     )}
                 </div>
 
-                {/* CONTENIDO DEL CARRITO */}
                 {cartProducts.length === 0 ? (
                     <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-sm">
                         <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -166,14 +191,12 @@ export default function CartPage() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                        {/* LISTA DE PRODUCTOS SELECCIONADOS */}
                         <div className="lg:col-span-2 space-y-4">
                             {cartProducts.map((producto) => (
                                 <div
                                     key={producto.id}
                                     className="bg-white border border-slate-200/80 rounded-2xl p-4 flex items-center gap-4 shadow-2xs hover:shadow-sm transition-shadow group"
                                 >
-                                    {/* IMAGEN (Clicable a pestaña nueva) */}
                                     <Link
                                         href={`/product/${producto.id}`}
                                         target="_blank"
@@ -189,7 +212,6 @@ export default function CartPage() {
                                         />
                                     </Link>
 
-                                    {/* INFO DEL PRODUCTO */}
                                     <div className="flex-1 min-w-0">
                                         <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
                                             {producto.category}
@@ -207,7 +229,6 @@ export default function CartPage() {
                                         </p>
                                     </div>
 
-                                    {/* ACCIONES (Ver en pestaña nueva + Eliminar directo) */}
                                     <div className="flex items-center gap-3">
                                         <Link
                                             href={`/product/${producto.id}`}
@@ -218,7 +239,6 @@ export default function CartPage() {
                                             Ver
                                         </Link>
 
-                                        {/* Botón directo de eliminación (sin confirmación) */}
                                         <button
                                             type="button"
                                             onClick={() => removeFromCart(producto.id)}
@@ -234,8 +254,6 @@ export default function CartPage() {
                             ))}
                         </div>
 
-                        {/* RESUMEN DE COTIZACIÓN & WHATSAPP */}
-                        {/* RESUMEN DE COTIZACIÓN & DATOS OPCIONALES */}
                         <div className="lg:col-span-1">
                             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm sticky top-24 space-y-6">
                                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 font-mono">
@@ -253,15 +271,19 @@ export default function CartPage() {
                                     </div>
                                 </div>
 
-                                {/* FORMULARIO OPCIONAL DE DATOS (Sin fricción obligatoria) */}
                                 <div className="space-y-3 pt-4 border-t border-slate-100">
-                                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400 block">
-                                        Datos de contacto (Opcional)
-                                    </span>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
+                                            Datos de contacto
+                                        </span>
+                                        <span className="text-[10px] font-mono text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">
+                                            Obligatorios *
+                                        </span>
+                                    </div>
 
                                     <input
                                         type="text"
-                                        placeholder="Tu nombre o empresa"
+                                        placeholder="Tu nombre o empresa *"
                                         value={clientName}
                                         onChange={(e) => setClientName(e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-950 transition-all"
@@ -269,7 +291,7 @@ export default function CartPage() {
 
                                     <input
                                         type="tel"
-                                        placeholder="Teléfono de contacto"
+                                        placeholder="Teléfono (WhatsApp) *"
                                         value={clientPhone}
                                         onChange={(e) => setClientPhone(e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-950 transition-all"
@@ -277,7 +299,7 @@ export default function CartPage() {
 
                                     <input
                                         type="email"
-                                        placeholder="Correo electrónico"
+                                        placeholder="Correo electrónico (Opcional)"
                                         value={clientEmail}
                                         onChange={(e) => setClientEmail(e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-950 transition-all"
@@ -290,18 +312,25 @@ export default function CartPage() {
                                         rows={2}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-950 transition-all resize-none"
                                     />
+
+                                    {formError && (
+                                        <p className="text-xs font-medium text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xl animate-shake">
+                                            {formError}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <button
                                     type="button"
                                     onClick={handleCheckoutWhatsApp}
-                                    className="w-full py-3.5 px-4 text-center text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
+                                    disabled={isSubmitting}
+                                    className="w-full py-3.5 px-4 text-center text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 disabled:opacity-50 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
                                 >
                                     <span className="relative flex h-2.5 w-2.5">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                                     </span>
-                                    <span>Enviar Cotización por WhatsApp</span>
+                                    <span>{isSubmitting ? "Guardando..." : "Enviar Cotización por WhatsApp"}</span>
                                 </button>
 
                                 <p className="text-[11px] text-slate-400 text-center leading-relaxed">
@@ -315,7 +344,6 @@ export default function CartPage() {
 
             </main>
 
-            {/* MODAL DE CONFIRMACIÓN SOLO PARA VACIAR TODO EL CARRITO */}
             {isConfirmOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
                     <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-xl text-center space-y-4">

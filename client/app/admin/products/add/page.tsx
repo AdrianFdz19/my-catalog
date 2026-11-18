@@ -27,9 +27,13 @@ export default function AddProductPage() {
   // Estado para controlar qué imagen se está viendo en pantalla grande
   const [selectedImageModal, setSelectedImageModal] = useState<string | null>(null);
 
+  // Estado para el Modal de Confirmación de Cancelación/Descarte
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchCategories() {
@@ -96,10 +100,8 @@ export default function AddProductPage() {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
 
-    // Acumulamos las nuevas imágenes con las que ya existían
     setImages((prev) => [...prev, ...filesArray]);
 
-    // Creamos URLs temporales para la previsualización visual
     const newPreviews = filesArray.map((file) => URL.createObjectURL(file));
     setImagePreviews((prev) => [...prev, ...newPreviews]);
   };
@@ -109,20 +111,23 @@ export default function AddProductPage() {
     setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
     setImagePreviews((prev) =>
       prev.filter((_, index) => {
-        // Liberamos la memoria del objeto URL creado
         URL.revokeObjectURL(prev[indexToRemove]);
         return index !== indexToRemove;
       })
     );
   };
 
-  const router = useRouter();
+  // Confirmar descarte, limpiar URLs temporales y salir
+  const handleConfirmDiscard = () => {
+    imagePreviews.forEach((src) => URL.revokeObjectURL(src));
+    setShowCancelModal(false);
+    router.push("/admin/products");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Guardamos las rutas internas por si necesitamos hacer rollback
     const uploadedPaths: string[] = [];
 
     try {
@@ -180,7 +185,6 @@ export default function AddProductPage() {
       alert("Producto guardado correctamente.");
       router.push("/");
       router.refresh();
-
     } catch (error) {
       // Rollback: Si algo falló después de subir imágenes, las borramos del bucket
       if (uploadedPaths.length > 0) {
@@ -199,17 +203,33 @@ export default function AddProductPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 py-6 sm:py-8 px-4 sm:px-6 lg:px-8 pb-28 sm:pb-12">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <nav className="text-sm text-slate-500 mb-1">
-              <Link href="/products" className="hover:text-slate-800 transition">
-                Products
-              </Link>{" "}
-              / <span className="text-slate-900 font-medium">Add New</span>
-            </nav>
+            {/* Breadcrumb + Cancel en Móvil */}
+            <div className="flex items-center justify-between mb-1">
+              <nav className="text-sm text-slate-500">
+                <Link href="/admin/products" className="hover:text-slate-800 transition">
+                  Products
+                </Link>{" "}
+                / <span className="text-slate-900 font-medium">Add New</span>
+              </nav>
+
+              {/* Botón Cancel discreto en la esquina superior derecha SOLO en móvil */}
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                className="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 rounded-lg transition cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel
+              </button>
+            </div>
+
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Add New Product
             </h1>
@@ -218,25 +238,27 @@ export default function AddProductPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition"
+          {/* Botones en Escritorio (Ocultos en Móvil) */}
+          <div className="hidden sm:flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowCancelModal(true)}
+              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition cursor-pointer"
             >
               Cancel
-            </Link>
+            </button>
             <button
               type="submit"
               form="add-product-form"
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 transition shadow-sm"
+              className="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 transition shadow-sm cursor-pointer"
             >
               {isSubmitting ? "Saving..." : "Save Product"}
             </button>
           </div>
         </div>
 
-        <ProductAiFillBox onFill={ handleAiFill } />
+        <ProductAiFillBox onFill={handleAiFill} />
 
         {/* Form Grid */}
         <form
@@ -325,7 +347,7 @@ export default function AddProductPage() {
                   {imagePreviews.map((src, index) => (
                     <div
                       key={index}
-                      onClick={() => setSelectedImageModal(src)} // Al hacer clic en la tarjeta se abre en grande
+                      onClick={() => setSelectedImageModal(src)}
                       className="relative group h-28 bg-slate-100 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center shadow-sm cursor-pointer"
                       title="Haz clic para ver en grande"
                     >
@@ -336,21 +358,19 @@ export default function AddProductPage() {
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
 
-                      {/* Ícono demostrativo al pasar el cursor para ampliar */}
                       <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <svg className="w-6 h-6 text-white drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                         </svg>
                       </div>
 
-                      {/* Botón para eliminar (X) */}
                       <button
                         type="button"
                         onClick={(e) => {
-                          e.stopPropagation(); // Evita que se abra el modal al querer borrar la foto
+                          e.stopPropagation();
                           handleRemoveImage(index);
                         }}
-                        className="absolute top-2 right-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition shadow-md z-10"
+                        className="absolute top-2 right-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shadow-md z-10 cursor-pointer"
                         title="Eliminar imagen"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -383,7 +403,7 @@ export default function AddProductPage() {
                 </div>
               </div>
 
-              {/* Description (Crucial for RAG embedding quality) */}
+              {/* Description */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label
@@ -533,6 +553,64 @@ export default function AddProductPage() {
         </form>
       </div>
 
+      {/* BARRA INFERIOR FIJA PARA MÓVIL (SOLO SAVE PRODUCT A ANCHO COMPLETO) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg">
+        <button
+          type="submit"
+          form="add-product-form"
+          disabled={isSubmitting}
+          className="w-full py-3 px-4 text-center text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800 active:scale-[0.99] disabled:opacity-50 transition shadow-md cursor-pointer"
+        >
+          {isSubmitting ? "Saving..." : "Save Product"}
+        </button>
+      </div>
+
+      {/* MODAL DE CONFIRMACIÓN PARA CANCELAR / DESCARTAR */}
+      {showCancelModal && (
+        <div
+          onClick={() => setShowCancelModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Discard new product?
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Are you sure you want to cancel? All entered details and uploaded photos will be permanently deleted.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDiscard}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition shadow-xs cursor-pointer"
+              >
+                Yes, Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE IMAGEN EN PANTALLA COMPLETA (LIGHTBOX) */}
       {selectedImageModal && (
         <div
@@ -540,18 +618,16 @@ export default function AddProductPage() {
           className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center">
-            {/* Botón flotante para cerrar */}
             <button
               type="button"
               onClick={() => setSelectedImageModal(null)}
-              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition backdrop-blur-md z-10"
+              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition backdrop-blur-md z-10 cursor-pointer"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            {/* Imagen ampliada */}
             <div className="relative w-full h-full min-h-[60vh]">
               <Image
                 src={selectedImageModal}
@@ -563,7 +639,6 @@ export default function AddProductPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

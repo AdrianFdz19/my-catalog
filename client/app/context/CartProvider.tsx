@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 
 interface CartContextType {
     guestUuid: string | null;
@@ -14,43 +14,47 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const [guestUuid, setGuestUuid] = useState<string | null>(null);
-    const [cartIds, setCartIds] = useState<(number | string)[]>([]);
-    const [showToast, setShowToast] = useState<boolean>(false);
-    const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
+    // 1. Inicialización segura del guestUuid sin useEffect
+    const [guestUuid] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
         let uuid = localStorage.getItem("guest_uuid");
         if (!uuid) {
             uuid = crypto.randomUUID();
             localStorage.setItem("guest_uuid", uuid);
         }
-        setGuestUuid(uuid);
+        return uuid;
+    });
 
-        const savedCart = localStorage.getItem("guest_cart_ids");
-        if (savedCart) {
-            try {
+    // 2. Inicialización segura del carrito sin useEffect
+    const [cartIds, setCartIds] = useState<(number | string)[]>(() => {
+        if (typeof window === "undefined") return [];
+        try {
+            const savedCart = localStorage.getItem("guest_cart_ids");
+            if (savedCart) {
                 const parsed = JSON.parse(savedCart);
-                if (Array.isArray(parsed)) {
-                    setCartIds(parsed);
-                }
-            } catch (error) {
-                console.error("Error al leer los IDs del carrito:", error);
+                if (Array.isArray(parsed)) return parsed;
             }
+        } catch (error) {
+            console.error("Error al leer los IDs del carrito:", error);
         }
-    }, []);
+        return [];
+    });
+
+    const [showToast, setShowToast] = useState<boolean>(false);
+    const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const addToCart = (productId: number | string) => {
+        const numericId = Number(productId); // Forzar a número desde el cliente
         setCartIds((prev) => {
-            const updated = [...prev, productId];
+            const updated = [...prev, numericId];
             localStorage.setItem("guest_cart_ids", JSON.stringify(updated));
             return updated;
         });
 
         // 🔊 Reproducir sonido sutil de éxito al agregar al carrito
         try {
-            const audio = new Audio("/sounds/added-to-cart-1.mp3"); // Puedes usar el mismo o apuntar a otro archivo ej: "/sounds/cart-pop.mp3"
-            audio.volume = 0.3; // Un volumen discreto
+            const audio = new Audio("/sounds/added-to-cart-1.mp3");
+            audio.volume = 0.3;
             audio.play().catch((e) => {
                 console.log("Audio bloqueado por políticas del navegador:", e);
             });

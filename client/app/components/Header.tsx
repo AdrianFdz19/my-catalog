@@ -18,6 +18,7 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -25,11 +26,6 @@ export default function Header() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchValue, setSearchValue] = useState(currentSearch);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Sincronizar estado local si cambian los searchParams externamente
-  useEffect(() => {
-    setSearchValue(currentSearch);
-  }, [currentSearch]);
 
   // Verificar si hay sesión activa
   useEffect(() => {
@@ -95,7 +91,7 @@ export default function Header() {
             {/* Botón de Carrito (Móvil) */}
             <button
               type="button"
-              onClick={() => alert(`Tienes ${totalCartItems} productos en tu carrito.`)}
+              onClick={() => router.push("/cart")}
               className="relative p-2 text-slate-700 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200/80 rounded-xl transition-all flex items-center justify-center"
               title="Ver Carrito"
             >
@@ -122,7 +118,7 @@ export default function Header() {
             )}
 
             <a
-              href={`https://wa.me/522291276558`}
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 active:scale-[0.98] rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
@@ -151,6 +147,7 @@ export default function Header() {
 
             <input
               ref={searchInputRef}
+              key={currentSearch}
               type="text"
               value={searchValue}
               onChange={handleSearchChange}
@@ -209,7 +206,7 @@ export default function Header() {
           )}
 
           <a
-            href={`https://wa.me/522291276558`}
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 active:scale-[0.98] rounded-xl transition-all flex items-center gap-2 shadow-xs"

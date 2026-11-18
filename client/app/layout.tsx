@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Mijail Catálogo - Tecnología & Seguridad",
+  title: "Mi Catalogo - Tecnología & Seguridad",
   description: "Catálogo exclusivo de laptops, equipos de cómputo y cámaras de seguridad.",
 };
 

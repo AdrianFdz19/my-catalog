@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormattedProduct } from "../../lib/products";
@@ -37,11 +37,12 @@ function AdminProductsContent() {
     const [confirmInput, setConfirmInput] = useState("");
     const [deleting, setDeleting] = useState(false);
 
-    const fetchProducts = useCallback(async (pageToFetch: number) => {
+    // Función de recarga manual para usar tras eliminar un producto
+    async function reloadCurrentPage() {
         try {
             setLoading(true);
             const response = await fetch(
-                `/api/admin/products?page=${pageToFetch}&limit=${ITEMS_PER_PAGE}`
+                `/api/admin/products?page=${currentPage}&limit=${ITEMS_PER_PAGE}`
             );
             const result = await response.json();
 
@@ -59,11 +60,13 @@ function AdminProductsContent() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }
 
+    // Carga inicial y por cambios de página sin llamadas síncronas en cascada
     useEffect(() => {
-        fetchProducts(currentPage);
-    }, [currentPage, fetchProducts]);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        reloadCurrentPage();
+    }, [currentPage]);
 
     function goToPage(newPage: number) {
         router.push(`/admin/products?page=${newPage}`);
@@ -90,8 +93,7 @@ function AdminProductsContent() {
             if (products.length === 1 && currentPage > 1) {
                 goToPage(currentPage - 1);
             } else {
-                // Volvemos a consultar la página actual para rellenar el hueco y actualizar totalItems
-                fetchProducts(currentPage);
+                reloadCurrentPage();
             }
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
@@ -117,6 +119,12 @@ function AdminProductsContent() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 relative">
+            <Link
+                href="/admin"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-950 transition-colors mb-3"
+            >
+                ← Volver al Panel Admin
+            </Link>
             {/* Encabezado */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
                 <div>
@@ -286,11 +294,10 @@ function AdminProductsContent() {
                                                     key={pageNum}
                                                     type="button"
                                                     onClick={() => goToPage(pageNum)}
-                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                                                        isActive
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-mono transition-all cursor-pointer ${isActive
                                                             ? "bg-slate-950 text-white font-semibold shadow-xs"
                                                             : "text-slate-600 hover:bg-slate-100 border border-transparent hover:border-slate-200/80"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {pageNum}
                                                 </button>
@@ -330,7 +337,6 @@ function AdminProductsContent() {
                             </button>
                         </div>
 
-                        {/* Tarjeta resumen del producto a eliminar */}
                         <div className="flex items-center gap-3.5 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
                             <div className="w-12 h-12 bg-white rounded-lg border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                                 {productToDelete.image_url ? (
@@ -387,7 +393,6 @@ function AdminProductsContent() {
     );
 }
 
-// Envuelto en Suspense para evitar errores en `next build` por usar useSearchParams()
 export default function AdminProductsPage() {
     return (
         <Suspense

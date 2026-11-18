@@ -74,7 +74,7 @@ resource "azurerm_container_app" "api" {
 
     container {
       name   = "mi-catalogo-ui"
-      image  = "${azurerm_container_registry.acr.login_server}/mi-catalogo:v2"
+      image  = "${azurerm_container_registry.acr.login_server}/mi-catalogo:v3"
       cpu    = "0.5"
       memory = "1.0Gi"
 

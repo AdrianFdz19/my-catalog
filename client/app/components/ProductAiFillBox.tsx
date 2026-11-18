@@ -71,6 +71,7 @@ export default function ProductAiFillBox({ onFill }: AiFillBoxProps) {
                 await handleProcess(text);
             }
         } catch (err) {
+            console.error(err);
             setError("No se pudo leer el archivo seleccionado.");
         } finally {
             setLoading(false);

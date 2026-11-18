@@ -144,7 +144,7 @@ function CategoryContent({ params }: PageProps) {
               {products.map((prod) => (
                 <Link
                   key={prod.id}
-                  href={`/products/${prod.slug}`}
+                  href={`/product/${prod.id}`}
                   className="group bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col"
                 >
                   <div className="relative h-48 bg-slate-100 overflow-hidden flex items-center justify-center border-b border-slate-100">

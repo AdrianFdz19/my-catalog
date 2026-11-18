@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/app/utils/supabase/client";
+import Link from "next/link";
 
 interface Category {
     id: string | number;
@@ -34,9 +35,9 @@ export default function AdminCategoriesPage() {
     const [editIcon, setEditIcon] = useState("💻");
     const [updating, setUpdating] = useState(false);
 
+    // Función principal para cargar categorías (accesible globalmente en el componente)
     const fetchCategories = useCallback(async () => {
         try {
-            setLoading(true);
             const { data, error } = await supabase
                 .from("categories")
                 .select("*")
@@ -52,8 +53,9 @@ export default function AdminCategoriesPage() {
         }
     }, [supabase]);
 
-    // Cargar categorías al montar la página
+    // Cargar al montar la página usando el efecto
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchCategories();
     }, [fetchCategories]);
 
@@ -172,6 +174,12 @@ export default function AdminCategoriesPage() {
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             {/* Encabezado */}
+            <Link
+                href="/admin"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-950 transition-colors mb-3"
+            >
+                ← Volver al Panel Admin
+            </Link>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
                 <div>
                     <div className="flex items-center gap-2.5">
@@ -258,8 +266,8 @@ export default function AdminCategoriesPage() {
                                     type="button"
                                     onClick={() => setSelectedIcon(icon)}
                                     className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm transition-all cursor-pointer ${selectedIcon === icon
-                                            ? "bg-slate-950 text-white shadow-sm scale-105"
-                                            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs"
+                                        ? "bg-slate-950 text-white shadow-sm scale-105"
+                                        : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs"
                                         }`}
                                 >
                                     {icon}

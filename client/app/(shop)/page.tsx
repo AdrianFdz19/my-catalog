@@ -306,7 +306,7 @@ function CatalogoContenido() {
                             Ver
                           </Link>
                           <a
-                            href={`https://wa.me/522291276558?text=${encodeURIComponent(
+                            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(
                               `Hola, me interesa el producto: ${producto.name} ($${producto.price} USD). ¿Sigue disponible?`
                             )}`}
                             target="_blank"

@@ -17,7 +17,7 @@ export default function AdminDashboardPage() {
     const [stats, setStats] = useState({
         productsCount: 0,
         categoriesCount: 0,
-        leadsCount: 0, // 👈 NUEVO: Estado para contar leads
+        leadsCount: 0,
     });
     const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function AdminDashboardPage() {
                     .from("categories")
                     .select("*", { count: "exact", head: true });
 
-                // 3. NUEVO: Contar leads (usuarios registrados desde el carrito)
+                // 3. Contar leads (usuarios registrados desde el carrito)
                 const { count: leadsCount } = await supabase
                     .from("users")
                     .select("*", { count: "exact", head: true });
@@ -99,10 +99,13 @@ export default function AdminDashboardPage() {
 
             {/* Tarjetas de Estadísticas (KPIs) - Ajustado a 4 columnas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* KPI 1: Total Productos */}
-                <div className="bg-white border border-slate-200/80 hover:border-slate-300 transition-colors p-5 rounded-2xl shadow-sm flex items-start justify-between">
+                {/* KPI 1: Total Productos (Clickeable -> /admin/products) */}
+                <Link
+                    href="/admin/products"
+                    className="bg-white border border-slate-200/80 hover:border-slate-900 transition-all p-5 rounded-2xl shadow-sm flex items-start justify-between group cursor-pointer"
+                >
                     <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-900 transition-colors">
                             Total Productos
                         </p>
                         <h3 className="text-3xl font-bold text-slate-900 mt-2 font-mono tabular-nums tracking-tight">
@@ -114,17 +117,20 @@ export default function AdminDashboardPage() {
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-1">Ítems publicados</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 group-hover:bg-slate-950 group-hover:text-white flex items-center justify-center text-slate-600 transition-colors">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
                     </div>
-                </div>
+                </Link>
 
-                {/* KPI 2: Categorías Activas */}
-                <div className="bg-white border border-slate-200/80 hover:border-slate-300 transition-colors p-5 rounded-2xl shadow-sm flex items-start justify-between">
+                {/* KPI 2: Categorías Activas (Clickeable -> /admin/categories) */}
+                <Link
+                    href="/admin/categories"
+                    className="bg-white border border-slate-200/80 hover:border-slate-900 transition-all p-5 rounded-2xl shadow-sm flex items-start justify-between group cursor-pointer"
+                >
                     <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-900 transition-colors">
                             Categorías Activas
                         </p>
                         <h3 className="text-3xl font-bold text-slate-900 mt-2 font-mono tabular-nums tracking-tight">
@@ -136,14 +142,14 @@ export default function AdminDashboardPage() {
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-1">Secciones organizadas</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 group-hover:bg-slate-950 group-hover:text-white flex items-center justify-center text-slate-600 transition-colors">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                         </svg>
                     </div>
-                </div>
+                </Link>
 
-                {/* KPI 3: Prospectos / Leads (NUEVO) */}
+                {/* KPI 3: Prospectos / Leads (Clickeable -> /admin/leads) */}
                 <Link
                     href="/admin/leads"
                     className="bg-white border border-slate-200/80 hover:border-slate-900 transition-all p-5 rounded-2xl shadow-sm flex items-start justify-between group cursor-pointer"
@@ -168,8 +174,8 @@ export default function AdminDashboardPage() {
                     </div>
                 </Link>
 
-                {/* KPI 4: Estado IA / RAG */}
-                <div className="bg-white border border-slate-200/80 hover:border-slate-300 transition-colors p-5 rounded-2xl shadow-sm flex items-start justify-between">
+                {/* KPI 4: Estado IA / RAG (Informativo - No clickeable) */}
+                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex items-start justify-between">
                     <div>
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                             Estado IA / RAG
@@ -276,9 +282,8 @@ export default function AdminDashboardPage() {
                         </p>
 
                         <div className="space-y-3">
-                            {/* NUEVO ACCESO RÁPIDO A LEADS */}
                             <Link
-                                href="/admin/users"
+                                href="/admin/leads"
                                 className="flex items-center justify-between p-4 rounded-xl border border-slate-200/80 hover:border-slate-900 hover:bg-slate-50/70 transition-all group"
                             >
                                 <div className="flex items-start gap-3.5">
