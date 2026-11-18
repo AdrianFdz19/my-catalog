@@ -300,7 +300,7 @@ function LeadProfileContent({ params }: PageProps) {
 
                       <div className="min-w-0">
                         <Link
-                          href={`/products/${product.slug}`}
+                          href={`/product/${product.id}`}
                           target="_blank"
                           className="text-xs font-semibold text-slate-900 hover:underline truncate block max-w-[200px] sm:max-w-sm"
                         >
